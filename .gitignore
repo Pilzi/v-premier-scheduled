@@ -37,3 +37,8 @@ build/
 
 ### Mac OS ###
 .DS_Store
+/.idea/.gitignore
+/.idea/discord.xml
+/.idea/encodings.xml
+/.idea/misc.xml
+/.idea/vcs.xml
