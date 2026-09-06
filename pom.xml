@@ -13,6 +13,8 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <java-version>25</java-version>
+    <hibernate.version>6.6.1.Final</hibernate.version>
+    <postgres.connection.version>42.7.13</postgres.connection.version>
   </properties>
 
   <dependencies>
@@ -46,6 +48,18 @@
       <groupId>net.dv8tion</groupId>
       <artifactId>JDA</artifactId>
       <version>6.5.0</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.hibernate</groupId>
+      <artifactId>hibernate-core</artifactId>
+      <version>${hibernate.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <version>${postgres.connection.version}</version>
     </dependency>
   </dependencies>
   <build>

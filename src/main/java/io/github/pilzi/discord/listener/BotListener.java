@@ -1,6 +1,8 @@
 package io.github.pilzi.discord.listener;
 
 import io.github.pilzi.discord.utils.Message.DropdownUtil;
+import io.github.pilzi.service.services.ImportService;
+import io.github.pilzi.service.services.impl.ImportServiceImpl;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.entities.Guild;
@@ -15,13 +17,27 @@ import org.jspecify.annotations.NonNull;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class BotListener extends ListenerAdapter {
+    @NonNull
     public static final String CHANNEL_NAME = "test";
+    @NonNull
     public static final String AGENDA_SUBMIT = "agenda-submit";
+    public static final int SCHEDULE_PERIOD_IN_HOURS = 1;
+    public static final int SCHEDULE_INITIAL_DELAY_IN_HOURS = 0;
+    @NonNull
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    @NonNull
+    private final ImportService importService = new ImportServiceImpl();
 
     @Override
     public void onReady(@NonNull ReadyEvent event) {
+        // Schedul regular event to fill the database with premier event data
+        scheduler.scheduleAtFixedRate(importService::importPremierData, SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.DAYS);
+
         List<Guild> guilds = event.getJDA().getGuilds();
 
         for (Guild guild : guilds) {
@@ -48,7 +64,7 @@ public class BotListener extends ListenerAdapter {
     }
 
     @Override
-    public void onButtonInteraction(ButtonInteractionEvent event) {
+    public void onButtonInteraction(@NonNull ButtonInteractionEvent event) {
         if (event.getComponentId().equals(AGENDA_SUBMIT)) {
             event.reply("Selection has been saved").setEphemeral(true).queue(); // send a message in the channel
         }
