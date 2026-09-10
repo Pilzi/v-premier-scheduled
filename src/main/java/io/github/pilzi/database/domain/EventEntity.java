@@ -3,6 +3,7 @@ package io.github.pilzi.database.domain;
 import io.github.pilzi.henrikdev.enums.Conference;
 import jakarta.persistence.*;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -15,25 +16,25 @@ public class EventEntity {
     private Long id;
 
     @NonNull
-    @Column(name = "map")
+    @Column(name = "map", nullable = false, length = 20)
     private String map;
 
     @NonNull
-    @Column(name = "start_at")
+    @Column(name = "start_at", nullable = false)
     private Instant startAt;
 
     @NonNull
-    @Column(name = "end_at")
+    @Column(name = "end_at", nullable = false)
     private Instant endAt;
 
     @NonNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "conference")
+    @Column(name = "conference", nullable = false, length = 20)
     private Conference conference;
 
-    @NonNull
+    @Nullable
     @ManyToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "season_id", referencedColumnName = "id")
+    @JoinColumn(name = "season_id", referencedColumnName = "id", nullable = false)
     private SeasonEntity season;
 
     public EventEntity(@NonNull String map,
@@ -55,8 +56,7 @@ public class EventEntity {
         return Objects.equals(map, that.map)
                 && Objects.equals(startAt, that.startAt)
                 && Objects.equals(endAt, that.endAt)
-                && conference == that.conference
-                && Objects.equals(season, that.season);
+                && Objects.equals(season.getExternalId(), that.season.getExternalId());
     }
 
     @Override
@@ -100,11 +100,11 @@ public class EventEntity {
         this.map = map;
     }
 
-    public @NonNull SeasonEntity getSeason() {
+    public @Nullable SeasonEntity getSeason() {
         return season;
     }
 
-    public void setSeason(@NonNull SeasonEntity season) {
+    public void setSeason(@Nullable SeasonEntity season) {
         this.season = season;
     }
 

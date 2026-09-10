@@ -1,7 +1,7 @@
 CREATE TABLE season
 (
     id        BIGINT       NOT NULL PRIMARY KEY,
-    season_id UUID         NOT NULL UNIQUE,
+    external_id UUID         NOT NULL UNIQUE,
     start_at  timestamp(6) NOT NULL,
     end_at    timestamp(6) NOT NULL
 );
@@ -16,4 +16,4 @@ CREATE TABLE event
     season_id  BIGINT       NOT NULL
         CONSTRAINT season_id_season_fk
             REFERENCES season ON DELETE CASCADE ON UPDATE CASCADE
-)
+);

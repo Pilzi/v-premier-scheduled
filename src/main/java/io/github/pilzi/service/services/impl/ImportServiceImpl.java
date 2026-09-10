@@ -2,6 +2,8 @@ package io.github.pilzi.service.services.impl;
 
 import io.github.pilzi.database.domain.EventEntity;
 import io.github.pilzi.database.domain.SeasonEntity;
+import io.github.pilzi.database.workers.EventWorker;
+import io.github.pilzi.database.workers.SeasonWorker;
 import io.github.pilzi.henrikdev.beans.Season;
 import io.github.pilzi.henrikdev.service.RestService;
 import io.github.pilzi.henrikdev.service.impl.RestServiceImpl;
@@ -13,11 +15,19 @@ import org.hibernate.Transaction;
 import org.hibernate.cfg.Configuration;
 import org.jspecify.annotations.NonNull;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class ImportServiceImpl implements ImportService {
     @NonNull
     public static final String HIBERNATE_CFG_XML = "hibernate.cfg.xml";
+
+    @NonNull
+    private final SeasonWorker seasonWorker = new SeasonWorker();
+
+    @NonNull
+    private final EventWorker eventWorker = new EventWorker();
 
     @Override
     public void importPremierData() {
@@ -29,17 +39,74 @@ public class ImportServiceImpl implements ImportService {
         try (SessionFactory sessionFactory = new Configuration().configure(HIBERNATE_CFG_XML).buildSessionFactory()) {
             session = sessionFactory.openSession();
             Transaction transaction = session.beginTransaction();
+
+            List<SeasonEntity> existingSeasonEntities = seasonWorker.getAll(session);
             List<SeasonEntity> seasonEntities = PremierImportHelperUtil.toSeasonEntity(seasons);
 
-            persistAll(session, seasonEntities);
+
+            List<SeasonEntity> seasonsToPersist = new ArrayList<>();
+            List<SeasonEntity> managedSeasonEntities = new ArrayList<>();
+            seasonEntities.forEach(seasonEntity -> {
+                Optional<SeasonEntity> matchingExistingEntity = existingSeasonEntities.stream()
+                        .filter(existingEntity -> existingEntity.getExternalId().equals(seasonEntity.getExternalId()))
+                        .findFirst();
+
+                if (matchingExistingEntity.isPresent()) {
+                    SeasonEntity existingSeason = matchingExistingEntity.get();
+                    seasonWorker.update(existingSeason, seasonEntity);
+                    managedSeasonEntities.add(existingSeason);
+                } else {
+                    seasonsToPersist.add(seasonEntity);
+                    managedSeasonEntities.add(seasonEntity);
+                }
+            });
+
+            persistAll(session, seasonsToPersist);
+
+            List<EventEntity> existingEventEntities = new ArrayList<>(eventWorker.getAll(session));
             List<EventEntity> eventEntities = PremierImportHelperUtil.toEventEntities(seasons, seasonEntities);
-            persistAll(session, eventEntities);
+
+            List<EventEntity> eventsToPersist = new ArrayList<>();
+            eventEntities.forEach(eventEntity -> {
+                Optional<EventEntity> matchingExistingEntity = existingEventEntities.stream()
+                        .filter(existingEntity -> existingEntity.equals(eventEntity))
+                        .findFirst();
+
+                if (matchingExistingEntity.isPresent()) {
+                    EventEntity existingEntity = matchingExistingEntity.get();
+                    existingEventEntities.remove(existingEntity);
+
+                    SeasonEntity managedSeason = managedSeasonEntities.stream()
+                            .filter(season -> season.getExternalId().equals(existingEntity.getSeason().getExternalId()))
+                            .findFirst()
+                            .orElseThrow();
+
+                    eventWorker.update(existingEntity,
+                            eventEntity,
+                            managedSeason);
+                } else {
+                    SeasonEntity parentSeason = managedSeasonEntities.stream()
+                            .filter(seasonEntity -> seasonEntity.getExternalId().equals(eventEntity.getSeason().getExternalId()))
+                            .findFirst()
+                            .orElseThrow();
+
+                    eventEntity.setSeason(parentSeason);
+
+                    eventsToPersist.add(eventEntity);
+                }
+            });
+
+            existingEventEntities.forEach(unusedEntity -> {
+                unusedEntity.setSeason(null);
+                session.remove(unusedEntity);
+            });
+
+            persistAll(session, eventsToPersist);
 
             transaction.commit();
             session.flush();
             session.close();
         }
-
     }
 
     private static <T> void persistAll(@NonNull Session session,

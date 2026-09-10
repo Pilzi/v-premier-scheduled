@@ -43,7 +43,7 @@ public class PremierImportHelperUtil {
 
     private static @NonNull SeasonEntity findMatchingSeasonEntity(@NonNull List<SeasonEntity> seasonEntities, @NonNull Season season) {
         return seasonEntities.stream()
-                .filter(entity -> entity.getSeasonId().equals(season.id()))
+                .filter(entity -> entity.getExternalId().equals(season.id()))
                 .findFirst()
                 .orElseThrow();
     }

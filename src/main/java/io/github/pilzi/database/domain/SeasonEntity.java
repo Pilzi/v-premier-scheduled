@@ -16,21 +16,21 @@ public class SeasonEntity {
     private Long id;
 
     @NonNull
-    @Column(name = "season_id")
-    private UUID seasonId;
+    @Column(name = "external_id", unique = true, nullable = false)
+    private UUID externalId;
 
     @NonNull
-    @Column(name = "start_at")
+    @Column(name = "start_at", nullable = false)
     private Instant startAt;
 
     @NonNull
-    @Column(name = "end_at")
+    @Column(name = "end_at", nullable = false)
     private Instant endAt;
 
-    public SeasonEntity(@NonNull UUID seasonId,
+    public SeasonEntity(@NonNull UUID externalId,
                         @NonNull Instant startAt,
                         @NonNull Instant endAt) {
-        this.seasonId = seasonId;
+        this.externalId = externalId;
         this.startAt = startAt;
         this.endAt = endAt;
     }
@@ -62,11 +62,11 @@ public class SeasonEntity {
         this.id = id;
     }
 
-    public @NonNull UUID getSeasonId() {
-        return seasonId;
+    public @NonNull UUID getExternalId() {
+        return externalId;
     }
 
-    public void setSeasonId(@NonNull UUID seasonId) {
-        this.seasonId = seasonId;
+    public void setExternalId(@NonNull UUID seasonId) {
+        this.externalId = seasonId;
     }
 }
