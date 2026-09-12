@@ -1,8 +1,12 @@
 package io.github.pilzi.discord.listener;
 
+import io.github.pilzi.database.workers.EventWorker;
+import io.github.pilzi.database.workers.SeasonWorker;
 import io.github.pilzi.discord.utils.Message.DropdownUtil;
 import io.github.pilzi.service.services.ImportService;
+import io.github.pilzi.service.services.PollService;
 import io.github.pilzi.service.services.impl.ImportServiceImpl;
+import io.github.pilzi.service.services.impl.PollServiceImpl;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.entities.Guild;
@@ -31,11 +35,19 @@ public class BotListener extends ListenerAdapter {
     @NonNull
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     @NonNull
-    private final ImportService importService = new ImportServiceImpl();
+    private final EventWorker eventWorker = new EventWorker();
+    @NonNull
+    private final SeasonWorker seasonWorker = new SeasonWorker();
+    @NonNull
+    private final ImportService importService = new ImportServiceImpl(seasonWorker, eventWorker);
+
+    @NonNull
+    private final PollService pollService = new PollServiceImpl(eventWorker);
 
     @Override
     public void onReady(@NonNull ReadyEvent event) {
         // Schedul regular event to fill the database with premier event data
+        scheduler.scheduleAtFixedRate(() -> pollService.handlePollForAllGuilds(event.getJDA().getGuilds()), SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.DAYS);
         scheduler.scheduleAtFixedRate(importService::importPremierData, SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.DAYS);
 
         List<Guild> guilds = event.getJDA().getGuilds();

@@ -24,10 +24,16 @@ public class ImportServiceImpl implements ImportService {
     public static final String HIBERNATE_CFG_XML = "hibernate.cfg.xml";
 
     @NonNull
-    private final SeasonWorker seasonWorker = new SeasonWorker();
+    private final SeasonWorker seasonWorker;
 
     @NonNull
-    private final EventWorker eventWorker = new EventWorker();
+    private final EventWorker eventWorker;
+
+    public ImportServiceImpl(@NonNull SeasonWorker seasonWorker,
+                             @NonNull EventWorker eventWorker) {
+        this.seasonWorker = seasonWorker;
+        this.eventWorker = eventWorker;
+    }
 
     @Override
     public void importPremierData() {
