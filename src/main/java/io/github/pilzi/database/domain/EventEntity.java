@@ -28,6 +28,10 @@ public class EventEntity {
     private Instant endAt;
 
     @NonNull
+    @Column(name = "is_practice", nullable = false)
+    private Boolean isPractice;
+
+    @NonNull
     @Enumerated(EnumType.STRING)
     @Column(name = "conference", nullable = false, length = 20)
     private Conference conference;
@@ -39,12 +43,13 @@ public class EventEntity {
 
     public EventEntity(@NonNull String map,
                        @NonNull Instant startAt,
-                       @NonNull Instant endAt,
+                       @NonNull Instant endAt, @NonNull Boolean isPractice,
                        @NonNull Conference conference,
                        @NonNull SeasonEntity season) {
         this.map = map;
         this.startAt = startAt;
         this.endAt = endAt;
+        this.isPractice = isPractice;
         this.conference = conference;
         this.season = season;
     }
@@ -56,12 +61,13 @@ public class EventEntity {
         return Objects.equals(map, that.map)
                 && Objects.equals(startAt, that.startAt)
                 && Objects.equals(endAt, that.endAt)
+                && Objects.equals(isPractice, that.isPractice)
                 && Objects.equals(season.getExternalId(), that.season.getExternalId());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(map, startAt, endAt, conference, season);
+        return Objects.hash(map, startAt, endAt, isPractice, conference, season);
     }
 
     protected EventEntity() {
@@ -114,5 +120,13 @@ public class EventEntity {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public @NonNull Boolean isPractice() {
+        return isPractice;
+    }
+
+    public void setIsPractice(@NonNull Boolean isPractice) {
+        this.isPractice = isPractice;
     }
 }

@@ -12,6 +12,7 @@ CREATE TABLE event
     map        VARCHAR(20)  NOT NULL,
     start_at   TIMESTAMP(6) NOT NULL,
     end_at     TIMESTAMP(6) NOT NULL,
+    is_practice BOOLEAN NOT NULL DEFAULT TRUE,
     conference VARCHAR(20)  NOT NULL,
     season_id  BIGINT       NOT NULL
         CONSTRAINT season_id_season_fk

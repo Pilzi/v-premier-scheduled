@@ -17,6 +17,8 @@ public class PremierImportHelperUtil {
     @NonNull
     public static final String TOURNAMENT_EVENT_TYPE = "TOURNAMENT";
     public static final int REGULAR_PREMIER_WEEK_IN_HOURS = 1;
+    // Scrim event are always practice matches the match result won't affect the actual team standing in the season
+    public static final String SCRIM_EVENT_TYPE = "SCRIM";
 
     @NonNull
     public static List<SeasonEntity> toSeasonEntity(@NonNull List<Season> seasons) {
@@ -68,7 +70,7 @@ public class PremierImportHelperUtil {
         }
 
         // TODO add playoffs (type "TOURNAMENT") its currently not possible to store multiple maps in database for a single event
-        return eventsMatchingConference.stream()
+        Set<EventEntity> mergedEventEntities = eventsMatchingConference.stream()
                 .filter(PremierImportHelperUtil::isEventOneHourLong)
                 .map(scheduledEvent -> {
                     Optional<Event> matchingEvent = typeFilteredEvents.stream().filter(event -> event.id().equals(scheduledEvent.id())).findFirst();
@@ -77,6 +79,7 @@ public class PremierImportHelperUtil {
                                     event.mapSelection().maps().stream().map(Map::name).findFirst().orElseThrow(),
                                     scheduledEvent.startsAt(),
                                     scheduledEvent.endsAt(),
+                                    event.type().equals(SCRIM_EVENT_TYPE),
                                     scheduledEvent.conference(),
                                     seasonEntity
                             ))
@@ -85,6 +88,36 @@ public class PremierImportHelperUtil {
                 })
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
+
+
+        return filterPracticeMatchesIfThereIsAlreadyAnMatchAtTheSameTime(mergedEventEntities);
+    }
+
+    /**
+     * Some conferences have both a practice and a match scheduled at the exact same time
+     * for the same map (this happens on the day a team's schedule transitions from the
+     * practice phase to the match phase — the last practice slot and the first match slot
+     * can land on the same day/time). In that case, only the match should count, so the
+     * practice entry is dropped.
+     *
+     * @param mergedEventEntities scheduled events merged into an eventEntity
+     * @return Set of entities with dropped practice matches scheduled at the exact same time
+     */
+    private static @NonNull Set<EventEntity> filterPracticeMatchesIfThereIsAlreadyAnMatchAtTheSameTime(Set<EventEntity> mergedEventEntities) {
+        return mergedEventEntities.stream().map(event -> {
+            List<EventEntity> matchingEvents = mergedEventEntities.stream()
+                    .filter(mergedEvent -> mergedEvent.getStartAt().equals(event.getStartAt())
+                            && mergedEvent.getEndAt().equals(event.getEndAt())
+                            && mergedEvent.getMap().equals(event.getMap())
+                            && mergedEvent.getConference().equals(event.getConference()))
+                    .toList();
+
+            if (matchingEvents.size() > 1) {
+                return matchingEvents.stream().filter(matchingEvent -> !matchingEvent.isPractice()).findAny().orElse(event);
+            }
+
+            return event;
+        }).collect(Collectors.toSet());
     }
 
     /**

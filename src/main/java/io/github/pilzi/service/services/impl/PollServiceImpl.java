@@ -5,9 +5,12 @@ import io.github.pilzi.database.domain.EventEntity;
 import io.github.pilzi.database.domain.GuildEntity;
 import io.github.pilzi.database.workers.EventWorker;
 import io.github.pilzi.database.workers.GuildWorker;
+import io.github.pilzi.discord.utils.Message.PollUtil;
 import io.github.pilzi.service.services.PollService;
 import io.github.pilzi.service.utils.CalendarUtil;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
@@ -15,7 +18,9 @@ import org.hibernate.cfg.Configuration;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
+import java.util.Optional;
 
+import static io.github.pilzi.discord.listener.BotListener.CHANNEL_NAME;
 import static io.github.pilzi.service.services.impl.ImportServiceImpl.HIBERNATE_CFG_XML;
 
 public class PollServiceImpl implements PollService {
@@ -58,6 +63,22 @@ public class PollServiceImpl implements PollService {
                             guildEntity,
                             eventsInCurrentWeek));
 
+                    Optional<GuildChannel> guildChannelOptional = guild.getChannels().stream()
+                            .filter(channel -> channel.getName().equals(CHANNEL_NAME))
+                            .findFirst();
+
+                    if (guildChannelOptional.isPresent()) {
+                        GuildChannel guildChannel = guildChannelOptional.get();
+
+                        String channelId = guildChannel.getId();
+                        TextChannel textChannel = guildChannel.getGuild().getTextChannelById(channelId);
+                        if (textChannel != null) {
+
+                            textChannel.sendMessage("")
+                                    .setPoll(PollUtil.buildEventPoll(eventsInCurrentWeek.getFirst().getMap(), eventsInCurrentWeek))
+                                    .queue(msg -> System.out.println("message id: " + msg.getIdLong()));
+                        }
+                    }
                 }
             });
 
