@@ -14,6 +14,8 @@ public class Bot {
     @NonNull
     public static final String DISCORD_API_KEY_ENV = "DISCORD_API_KEY";
     @NonNull
+    public static final String POLL_CHANNEL_NAME_ENV = "POLL_CHANNEL_NAME";
+    @NonNull
     public static final Dotenv DOTENV = Dotenv.load();
 
     static void main() {

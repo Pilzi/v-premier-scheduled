@@ -23,7 +23,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static io.github.pilzi.discord.listener.BotListener.CHANNEL_NAME;
+import static io.github.pilzi.discord.Bot.DOTENV;
+import static io.github.pilzi.discord.Bot.POLL_CHANNEL_NAME_ENV;
 
 public class PollServiceImpl implements PollService {
 
@@ -85,7 +86,7 @@ public class PollServiceImpl implements PollService {
                             .forEach(session::persist);
 
                     Optional<GuildChannel> guildChannelOptional = guild.getChannels().stream()
-                            .filter(channel -> channel.getName().equals(CHANNEL_NAME))
+                            .filter(channel -> channel.getName().equals(DOTENV.get(POLL_CHANNEL_NAME_ENV)))
                             .findFirst();
 
                     if (guildChannelOptional.isPresent()) {

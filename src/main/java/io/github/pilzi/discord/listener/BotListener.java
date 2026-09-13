@@ -19,8 +19,6 @@ import java.util.concurrent.TimeUnit;
 
 public class BotListener extends ListenerAdapter {
     @NonNull
-    public static final String CHANNEL_NAME = "test";
-    @NonNull
     public static final String AGENDA_SUBMIT = "agenda-submit";
     public static final int SCHEDULE_PERIOD_IN_HOURS = 1;
     public static final int SCHEDULE_INITIAL_DELAY_IN_HOURS = 0;
