@@ -18,9 +18,6 @@
         <!-- SQL dialect -->
         <property name="hibernate.dialect">org.hibernate.dialect.PostgreSQLDialect</property>
 
-        <!-- table generation mode -->
-        <property name="hibernate.hbm2ddl.auto">update</property>
-
         <!-- Show SQL statements in console -->
         <property name="hibernate.show_sql">true</property>
         <property name="hibernate.format_sql">true</property>
@@ -28,5 +25,7 @@
         <!-- Specify annotated classes -->
         <mapping class="io.github.pilzi.database.domain.EventEntity"/>
         <mapping class="io.github.pilzi.database.domain.SeasonEntity"/>
+        <mapping class="io.github.pilzi.database.domain.GuildEntity"/>
+        <mapping class="io.github.pilzi.database.domain.ActivePollEntity"/>
     </session-factory>
 </hibernate-configuration>

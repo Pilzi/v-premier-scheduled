@@ -37,7 +37,7 @@ public class EventWorker {
                 .toList());
         }
 
-        public boolean isEventInCurrentWeek(@NonNull EventEntity event) {
+        private boolean isEventInCurrentWeek(@NonNull EventEntity event) {
             LocalDate firstDayOfCurrentWeek = CalendarUtil.getFirstDayOfCurrentWeek();
             LocalDate lastDayOfCurrentWeek = CalendarUtil.getLastDayOfCurrentWeek();
 
