@@ -1,6 +1,7 @@
 package io.github.pilzi.service.services.impl;
 
 import io.github.pilzi.database.domain.*;
+import io.github.pilzi.database.utils.HibernateSessionFactoryUtil;
 import io.github.pilzi.database.workers.ActivePollEventReferenceWorker;
 import io.github.pilzi.database.workers.ActivePollVoteWorker;
 import io.github.pilzi.database.workers.EventWorker;
@@ -15,7 +16,6 @@ import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
-import org.hibernate.cfg.Configuration;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Comparator;
@@ -24,7 +24,6 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.github.pilzi.discord.listener.BotListener.CHANNEL_NAME;
-import static io.github.pilzi.service.services.impl.ImportServiceImpl.HIBERNATE_CFG_XML;
 
 public class PollServiceImpl implements PollService {
 
@@ -53,9 +52,8 @@ public class PollServiceImpl implements PollService {
     @Override
     public void handlePollForAllGuilds(@NonNull List<Guild> guilds) {
         Transaction transaction = null;
-        try (SessionFactory sessionFactory = new Configuration().configure(HIBERNATE_CFG_XML)
-                .buildSessionFactory()) {
-            Session session = sessionFactory.openSession();
+        SessionFactory sessionFactory = HibernateSessionFactoryUtil.get();
+        try (Session session = sessionFactory.openSession()) {
             transaction = session.beginTransaction();
 
             List<EventEntity> eventsInCurrentWeek = eventWorker.collectEventsForCurrentWeek(session);
@@ -107,7 +105,6 @@ public class PollServiceImpl implements PollService {
             });
             transaction.commit();
             session.flush();
-            session.close();
         } catch (Exception e) {
             if (transaction != null) {
                 transaction.rollback();
@@ -121,9 +118,8 @@ public class PollServiceImpl implements PollService {
                         long answerId,
                         long messageId) {
         Transaction transaction = null;
-        try (SessionFactory sessionFactory = new Configuration().configure(HIBERNATE_CFG_XML)
-                .buildSessionFactory()) {
-            Session session = sessionFactory.openSession();
+        SessionFactory sessionFactory = HibernateSessionFactoryUtil.get();
+        try (Session session = sessionFactory.openSession()) {
             transaction = session.beginTransaction();
 
             ActivePollEventReferenceEntity activePollEventReferenceEntity = activePollEventReferenceWorker.findByMessageIdAndIndex(session, messageId, answerId);
@@ -133,7 +129,6 @@ public class PollServiceImpl implements PollService {
             }
 
             transaction.commit();
-            session.close();
         } catch (Exception e) {
             if (transaction != null) {
                 transaction.rollback();
@@ -144,12 +139,11 @@ public class PollServiceImpl implements PollService {
 
     @Override
     public void removeVote(long userId,
-                        long answerId,
-                        long messageId) {
+                           long answerId,
+                           long messageId) {
         Transaction transaction = null;
-        try (SessionFactory sessionFactory = new Configuration().configure(HIBERNATE_CFG_XML)
-                .buildSessionFactory()) {
-            Session session = sessionFactory.openSession();
+        SessionFactory sessionFactory = HibernateSessionFactoryUtil.get();
+        try (Session session = sessionFactory.openSession()) {
             transaction = session.beginTransaction();
 
             ActivePollVoteEntity activePollVoteEntity = activePollVoteWorker.find(session, answerId, messageId, userId);
@@ -158,7 +152,6 @@ public class PollServiceImpl implements PollService {
                 session.remove(activePollVoteEntity);
             }
             transaction.commit();
-            session.close();
         } catch (Exception e) {
             if (transaction != null) {
                 transaction.rollback();

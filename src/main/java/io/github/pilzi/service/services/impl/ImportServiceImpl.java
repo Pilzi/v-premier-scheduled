@@ -2,6 +2,7 @@ package io.github.pilzi.service.services.impl;
 
 import io.github.pilzi.database.domain.EventEntity;
 import io.github.pilzi.database.domain.SeasonEntity;
+import io.github.pilzi.database.utils.HibernateSessionFactoryUtil;
 import io.github.pilzi.database.workers.EventWorker;
 import io.github.pilzi.database.workers.SeasonWorker;
 import io.github.pilzi.henrikdev.beans.Season;
@@ -12,16 +13,20 @@ import io.github.pilzi.service.utils.PremierImportHelperUtil;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
-import org.hibernate.cfg.Configuration;
 import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import static io.github.pilzi.discord.Bot.DOTENV;
+
 public class ImportServiceImpl implements ImportService {
+
     @NonNull
-    public static final String HIBERNATE_CFG_XML = "hibernate.cfg.xml";
+    public static final String HENRIKDEV_API_KEY_ENV = "HENRIKDEV_API_KEY";
+    @NonNull
+    public static final String VALORANT_REGION_ENV = "VALORANT_REGION";
 
     @NonNull
     private final SeasonWorker seasonWorker;
@@ -37,13 +42,11 @@ public class ImportServiceImpl implements ImportService {
 
     @Override
     public void importPremierData() {
-        RestService restService = new RestServiceImpl("<Token>", "eu");
+        RestService restService = new RestServiceImpl(DOTENV.get(HENRIKDEV_API_KEY_ENV), DOTENV.get(VALORANT_REGION_ENV));
 
         List<Season> seasons = restService.getSeasons().data();
-
-        Session session;
-        try (SessionFactory sessionFactory = new Configuration().configure(HIBERNATE_CFG_XML).buildSessionFactory()) {
-            session = sessionFactory.openSession();
+        SessionFactory sessionFactory = HibernateSessionFactoryUtil.get();
+        try (Session session = sessionFactory.openSession()) {
             Transaction transaction = session.beginTransaction();
 
             List<SeasonEntity> existingSeasonEntities = seasonWorker.getAll(session);
@@ -111,7 +114,6 @@ public class ImportServiceImpl implements ImportService {
 
             transaction.commit();
             session.flush();
-            session.close();
         }
     }
 
