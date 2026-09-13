@@ -5,7 +5,6 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
-import java.util.List;
 
 @Entity
 @Table(name = "active_poll")
@@ -32,26 +31,15 @@ public class ActivePollEntity {
     @JoinColumn(name = "guild_id", nullable = false, unique = true)
     private GuildEntity guild;
 
-    @NonNull
-    @ManyToMany
-    @JoinTable(
-            name = "active_poll_event_reference",
-            joinColumns = @JoinColumn(name = "active_poll_id"),
-            inverseJoinColumns = @JoinColumn(name = "event_id")
-    )
-    private List<EventEntity> events;
-
     public ActivePollEntity(@NonNull Instant startAt,
                             @NonNull Instant endAt,
-                            @NonNull GuildEntity guild,
-                            @NonNull List<EventEntity> events) {
+                            @NonNull GuildEntity guild) {
         this.startAt = startAt;
         this.endAt = endAt;
         this.guild = guild;
-        this.events = events;
     }
 
-    protected ActivePollEntity(){}
+    protected ActivePollEntity() {}
 
     public @NonNull Instant getStartAt() {
         return startAt;
@@ -77,19 +65,19 @@ public class ActivePollEntity {
         this.guild = guild;
     }
 
-    public @NonNull List<EventEntity> getEvents() {
-        return events;
-    }
-
-    public void setEvents(@NonNull List<EventEntity> events) {
-        this.events = events;
-    }
-
     public @Nullable Long getMessageId() {
         return messageId;
     }
 
     public void setMessageId(@Nullable Long messageId) {
         this.messageId = messageId;
+    }
+
+    public @Nullable Long getId() {
+        return id;
+    }
+
+    public void setId(@Nullable Long id) {
+        this.id = id;
     }
 }

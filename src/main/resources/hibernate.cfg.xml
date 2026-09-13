@@ -27,5 +27,7 @@
         <mapping class="io.github.pilzi.database.domain.SeasonEntity"/>
         <mapping class="io.github.pilzi.database.domain.GuildEntity"/>
         <mapping class="io.github.pilzi.database.domain.ActivePollEntity"/>
+        <mapping class="io.github.pilzi.database.domain.ActivePollEventReferenceEntity"/>
+        <mapping class="io.github.pilzi.database.domain.ActivePollVoteEntity"/>
     </session-factory>
 </hibernate-configuration>
