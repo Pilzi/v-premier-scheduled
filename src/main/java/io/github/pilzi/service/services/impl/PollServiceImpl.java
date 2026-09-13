@@ -1,9 +1,8 @@
 package io.github.pilzi.service.services.impl;
 
-import io.github.pilzi.database.domain.ActivePollEntity;
-import io.github.pilzi.database.domain.ActivePollEventReferenceEntity;
-import io.github.pilzi.database.domain.EventEntity;
-import io.github.pilzi.database.domain.GuildEntity;
+import io.github.pilzi.database.domain.*;
+import io.github.pilzi.database.workers.ActivePollEventReferenceWorker;
+import io.github.pilzi.database.workers.ActivePollVoteWorker;
 import io.github.pilzi.database.workers.EventWorker;
 import io.github.pilzi.database.workers.GuildWorker;
 import io.github.pilzi.discord.utils.Message.PollUtil;
@@ -35,19 +34,29 @@ public class PollServiceImpl implements PollService {
     @NonNull
     private final GuildWorker guildWorker;
 
+    @NonNull
+    private final ActivePollEventReferenceWorker activePollEventReferenceWorker;
+
+    @NonNull
+    private final ActivePollVoteWorker activePollVoteWorker;
+
     public PollServiceImpl(@NonNull EventWorker eventWorker,
-                           @NonNull GuildWorker guildWorker) {
+                           @NonNull GuildWorker guildWorker,
+                           @NonNull ActivePollEventReferenceWorker activePollEventReferenceWorker,
+                           @NonNull ActivePollVoteWorker activePollVoteWorker) {
         this.eventWorker = eventWorker;
         this.guildWorker = guildWorker;
+        this.activePollEventReferenceWorker = activePollEventReferenceWorker;
+        this.activePollVoteWorker = activePollVoteWorker;
     }
 
     @Override
     public void handlePollForAllGuilds(@NonNull List<Guild> guilds) {
-        Session session;
+        Transaction transaction = null;
         try (SessionFactory sessionFactory = new Configuration().configure(HIBERNATE_CFG_XML)
                 .buildSessionFactory()) {
-            session = sessionFactory.openSession();
-            Transaction transaction = session.beginTransaction();
+            Session session = sessionFactory.openSession();
+            transaction = session.beginTransaction();
 
             List<EventEntity> eventsInCurrentWeek = eventWorker.collectEventsForCurrentWeek(session);
 
@@ -67,7 +76,7 @@ public class PollServiceImpl implements PollService {
                             guildEntity);
                     session.persist(newCreatedActivePollEntity);
                     guildEntity.setActivePoll(newCreatedActivePollEntity);
-                    AtomicInteger orderIndex = new AtomicInteger(0);
+                    AtomicInteger orderIndex = new AtomicInteger(1);
                     eventsInCurrentWeek.stream()
                             .sorted(Comparator.comparing(EventEntity::getStartAt))
                             .map((eventInCurrentWeek) -> {
@@ -96,10 +105,65 @@ public class PollServiceImpl implements PollService {
                     }
                 }
             });
-
             transaction.commit();
             session.flush();
             session.close();
+        } catch (Exception e) {
+            if (transaction != null) {
+                transaction.rollback();
+            }
+            throw e;
+        }
+    }
+
+    @Override
+    public void addVote(long userId,
+                        long answerId,
+                        long messageId) {
+        Transaction transaction = null;
+        try (SessionFactory sessionFactory = new Configuration().configure(HIBERNATE_CFG_XML)
+                .buildSessionFactory()) {
+            Session session = sessionFactory.openSession();
+            transaction = session.beginTransaction();
+
+            ActivePollEventReferenceEntity activePollEventReferenceEntity = activePollEventReferenceWorker.findByMessageIdAndIndex(session, messageId, answerId);
+
+            if (activePollEventReferenceEntity != null) {
+                session.persist(new ActivePollVoteEntity(userId, activePollEventReferenceEntity));
+            }
+
+            transaction.commit();
+            session.close();
+        } catch (Exception e) {
+            if (transaction != null) {
+                transaction.rollback();
+            }
+            throw e;
+        }
+    }
+
+    @Override
+    public void removeVote(long userId,
+                        long answerId,
+                        long messageId) {
+        Transaction transaction = null;
+        try (SessionFactory sessionFactory = new Configuration().configure(HIBERNATE_CFG_XML)
+                .buildSessionFactory()) {
+            Session session = sessionFactory.openSession();
+            transaction = session.beginTransaction();
+
+            ActivePollVoteEntity activePollVoteEntity = activePollVoteWorker.find(session, answerId, messageId, userId);
+
+            if (activePollVoteEntity != null) {
+                session.remove(activePollVoteEntity);
+            }
+            transaction.commit();
+            session.close();
+        } catch (Exception e) {
+            if (transaction != null) {
+                transaction.rollback();
+            }
+            throw e;
         }
     }
 }

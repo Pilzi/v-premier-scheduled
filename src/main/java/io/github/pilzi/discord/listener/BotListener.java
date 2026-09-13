@@ -1,8 +1,6 @@
 package io.github.pilzi.discord.listener;
 
-import io.github.pilzi.database.workers.EventWorker;
-import io.github.pilzi.database.workers.GuildWorker;
-import io.github.pilzi.database.workers.SeasonWorker;
+import io.github.pilzi.database.workers.*;
 import io.github.pilzi.discord.utils.Message.DropdownUtil;
 import io.github.pilzi.service.services.ImportService;
 import io.github.pilzi.service.services.PollService;
@@ -15,6 +13,8 @@ import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.GenericSelectMenuInteractionEvent;
+import net.dv8tion.jda.api.events.message.poll.MessagePollVoteAddEvent;
+import net.dv8tion.jda.api.events.message.poll.MessagePollVoteRemoveEvent;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.jspecify.annotations.NonNull;
@@ -41,12 +41,14 @@ public class BotListener extends ListenerAdapter {
     private final SeasonWorker seasonWorker = new SeasonWorker();
     @NonNull
     private final ImportService importService = new ImportServiceImpl(seasonWorker, eventWorker);
-
     @NonNull
     private final GuildWorker guildWorker = new GuildWorker();
-
     @NonNull
-    private final PollService pollService = new PollServiceImpl(eventWorker, guildWorker);
+    private final ActivePollEventReferenceWorker activePollEventReferenceWorker = new ActivePollEventReferenceWorker();
+    @NonNull
+    private final ActivePollVoteWorker activePollVoteWorker = new ActivePollVoteWorker();
+    @NonNull
+    private final PollService pollService = new PollServiceImpl(eventWorker, guildWorker, activePollEventReferenceWorker, activePollVoteWorker);
 
     @Override
     public void onReady(@NonNull ReadyEvent event) {
@@ -87,6 +89,15 @@ public class BotListener extends ListenerAdapter {
         if (event.getComponentId().equals(AGENDA_SUBMIT)) {
             event.reply("Selection has been saved").setEphemeral(true).queue(); // send a message in the channel
         }
+    }
+    @Override
+    public void onMessagePollVoteAdd(@NonNull MessagePollVoteAddEvent event) {
+        pollService.addVote(event.getUserIdLong(), event.getAnswerId(), event.getMessageIdLong());
+    }
+
+    @Override
+    public void onMessagePollVoteRemove(@NonNull MessagePollVoteRemoveEvent event) {
+        pollService.removeVote(event.getUserIdLong(), event.getAnswerId(), event.getMessageIdLong());
     }
 
     @Override

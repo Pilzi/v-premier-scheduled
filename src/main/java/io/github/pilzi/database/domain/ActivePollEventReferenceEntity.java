@@ -5,7 +5,6 @@ import jakarta.persistence.*;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-
 @Entity
 @Table(name = "active_poll_event_reference")
 public class ActivePollEventReferenceEntity {
@@ -64,5 +63,13 @@ public class ActivePollEventReferenceEntity {
 
     public void setOrderIndex(@NonNull Long orderIndex) {
         this.orderIndex = orderIndex;
+    }
+
+    public @Nullable ActivePollEventReferenceIdBean getId() {
+        return id;
+    }
+
+    public void setId(@Nullable ActivePollEventReferenceIdBean id) {
+        this.id = id;
     }
 }

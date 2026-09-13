@@ -21,7 +21,7 @@ public class ActivePollVoteEntity {
     private Long userId;
 
     @NonNull
-    @ManyToOne(cascade = CascadeType.ALL)
+    @ManyToOne
     @JoinColumns({
             @JoinColumn(name = "active_poll_id", referencedColumnName = "active_poll_id", nullable = false, updatable = false),
             @JoinColumn(name = "event_id", referencedColumnName = "event_id", nullable = false, updatable = false)
@@ -50,5 +50,13 @@ public class ActivePollVoteEntity {
 
     public void setActivePollEventReference(@NonNull ActivePollEventReferenceEntity activePollEventReference) {
         this.activePollEventReference = activePollEventReference;
+    }
+
+    public @Nullable Long getId() {
+        return id;
+    }
+
+    public void setId(@Nullable Long id) {
+        this.id = id;
     }
 }
