@@ -30,6 +30,7 @@ CREATE TABLE active_poll
 (
     id       BIGINT       NOT NULL PRIMARY KEY,
     start_at TIMESTAMP(6) NOT NULL,
+    message_id BIGINT UNIQUE,
     end_at   TIMESTAMP(6) NOT NULL,
     guild_id BIGINT       NOT NULL
         CONSTRAINT guild_id_guild_fk

@@ -43,8 +43,8 @@ public class CalendarUtil {
         LocalDate firstDayOfCurrentWeek = CalendarUtil.getFirstDayOfCurrentWeek();
         LocalDate lastDayOfCurrentWeek = CalendarUtil.getLastDayOfCurrentWeek();
 
-        return LocalDate.ofInstant(start, ZoneId.systemDefault()).isAfter(firstDayOfCurrentWeek)
-                && LocalDate.ofInstant(end, ZoneId.systemDefault()).isBefore(lastDayOfCurrentWeek);
+        return firstDayOfCurrentWeek.isEqual(LocalDate.ofInstant(start, ZoneId.systemDefault()))
+                && lastDayOfCurrentWeek.isEqual(LocalDate.ofInstant(end, ZoneId.systemDefault()));
     }
 
 }

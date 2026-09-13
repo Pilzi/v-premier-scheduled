@@ -23,6 +23,10 @@ public class ActivePollEntity {
     @Column(name = "end_at", nullable = false)
     private Instant endAt;
 
+    @Nullable
+    @Column(name = "message_id", unique = true)
+    private Long messageId;
+
     @NonNull
     @OneToOne
     @JoinColumn(name = "guild_id", nullable = false, unique = true)
@@ -79,5 +83,13 @@ public class ActivePollEntity {
 
     public void setEvents(@NonNull List<EventEntity> events) {
         this.events = events;
+    }
+
+    public @Nullable Long getMessageId() {
+        return messageId;
+    }
+
+    public void setMessageId(@Nullable Long messageId) {
+        this.messageId = messageId;
     }
 }

@@ -57,7 +57,7 @@ public class PollServiceImpl implements PollService {
                     guildEntity.setActivePoll(null);
                 }
 
-                if (activePollEntity == null) {
+                if (activePollEntity == null || activePollEntity.getMessageId() == null) {
                     guildEntity.setActivePoll(new ActivePollEntity(CalendarUtil.getFirstInstantOfCurrentWeek(),
                             CalendarUtil.getLastInstantOfCurrentWeek(),
                             guildEntity,
@@ -76,7 +76,7 @@ public class PollServiceImpl implements PollService {
 
                             textChannel.sendMessage("")
                                     .setPoll(PollUtil.buildEventPoll(eventsInCurrentWeek.getFirst().getMap(), eventsInCurrentWeek))
-                                    .queue(msg -> System.out.println("message id: " + msg.getIdLong()));
+                                    .queue(msg -> guildEntity.getActivePoll().setMessageId(msg.getIdLong()));
                         }
                     }
                 }
