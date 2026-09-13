@@ -10,10 +10,13 @@ import java.util.Comparator;
 import java.util.List;
 
 public class PollUtil {
-
+    @NonNull
     public static final String PRACTICE_DAY_TEXT = "Practice";
+    @NonNull
     public static final String MATCH_DAY_TEXT = "Match";
+    @NonNull
     public static final String DAY_TYPE_TIME_SEPARATOR = ": ";
+    public static final int DEFAULT_POLL_DURATION_DAYS = 5;
 
     @NonNull
     public static MessagePollData buildEventPoll(@NonNull String title,
@@ -31,7 +34,7 @@ public class PollUtil {
 
     return pollBuilder
             .setMultiAnswer(true)
-            .setDuration(Duration.ofHours(72))
+            .setDuration(Duration.ofDays(DEFAULT_POLL_DURATION_DAYS))
             .build();
     }
 
