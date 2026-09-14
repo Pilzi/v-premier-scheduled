@@ -16,7 +16,7 @@ public class Bot {
     @NonNull
     public static final String POLL_CHANNEL_NAME_ENV = "POLL_CHANNEL_NAME";
     @NonNull
-    public static final Dotenv DOTENV = Dotenv.load();
+    public static final Dotenv DOTENV = Dotenv.configure().ignoreIfMissing().load();
 
     static void main() {
         JDABuilder.createLight(DOTENV.get(DISCORD_API_KEY_ENV), EnumSet.of(GatewayIntent.GUILD_MESSAGES, GatewayIntent.MESSAGE_CONTENT, GatewayIntent.GUILD_MESSAGE_POLLS))
