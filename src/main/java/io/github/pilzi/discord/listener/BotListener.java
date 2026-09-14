@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 public class BotListener extends ListenerAdapter {
     @NonNull
     public static final String AGENDA_SUBMIT = "agenda-submit";
-    public static final int SCHEDULE_PERIOD_IN_HOURS = 1;
+    public static final int SCHEDULE_PERIOD_IN_HOURS = 2;
     public static final int SCHEDULE_INITIAL_DELAY_IN_HOURS = 0;
     @NonNull
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
@@ -42,10 +42,10 @@ public class BotListener extends ListenerAdapter {
     @Override
     public void onReady(@NonNull ReadyEvent event) {
         // Schedul regular event to fill the database with premier event data
-        scheduler.scheduleAtFixedRate(importService::importPremierData, SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.DAYS);
+        scheduler.scheduleAtFixedRate(importService::importPremierData, SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.HOURS);
 
         // Check if there is an active poll for the next event week
-        scheduler.scheduleAtFixedRate(() -> pollService.handlePollForAllGuilds(event.getJDA().getGuilds()), SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.DAYS);
+        scheduler.scheduleAtFixedRate(() -> pollService.handlePollForAllGuilds(event.getJDA().getGuilds()), SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.HOURS);
     }
 
     @Override
