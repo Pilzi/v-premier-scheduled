@@ -3,9 +3,9 @@ services:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
 
@@ -15,10 +15,12 @@ services:
     depends_on:
       - postgres
     environment:
-      DISCORD_TOKEN: ${DISCORD_TOKEN}
-      DB_HOST: postgres
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
+      DISCORD_API_KEY: ${DISCORD_API_KEY}
+      HENRIKDEV_API_KEY: ${HENRIKDEV_API_KEY}
+      VALORANT_REGION: ${VALORANT_REGION}
+      POLL_CHANNEL_NAME: ${POLL_CHANNEL_NAME}
+      DB_URL: ${DB_URL}
+      DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
 
 volumes:
