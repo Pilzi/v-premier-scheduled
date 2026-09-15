@@ -16,6 +16,7 @@ services:
     depends_on:
       - postgres
     environment:
+      TZ: Europe/Berlin
       DISCORD_API_KEY: ${DISCORD_API_KEY}
       HENRIKDEV_API_KEY: ${HENRIKDEV_API_KEY}
       VALORANT_REGION: ${VALORANT_REGION}
