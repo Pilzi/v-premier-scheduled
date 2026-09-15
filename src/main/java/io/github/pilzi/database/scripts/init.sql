@@ -65,3 +65,9 @@ CREATE TABLE active_poll_vote
     CONSTRAINT active_poll_vote_unique
         UNIQUE (active_poll_id, event_id, user_id)
 );
+
+CREATE TABLE hibernate_sequences
+(
+    sequence_name VARCHAR(255) NOT NULL PRIMARY KEY,
+    next_val      BIGINT
+);
