@@ -1,5 +1,6 @@
-package io.github.pilzi.database.utils;
+package io.github.pilzi.service.services.impl;
 
+import io.github.pilzi.service.services.HibernateSessionFactoryService;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
 import org.jspecify.annotations.NonNull;
@@ -7,12 +8,12 @@ import org.jspecify.annotations.NonNull;
 import static io.github.pilzi.discord.Bot.DOTENV;
 import static io.github.pilzi.discord.Bot.HIBERNATE_CFG_XML;
 
-public class HibernateSessionFactoryUtil {
+public class HibernateSessionFactoryServiceImpl implements HibernateSessionFactoryService {
     @NonNull
     private static final SessionFactory SESSION_FACTORY = build();
 
     @NonNull
-    public static SessionFactory get() {
+    public SessionFactory get() {
         return SESSION_FACTORY;
     }
 

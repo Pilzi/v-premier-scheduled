@@ -2,12 +2,12 @@ package io.github.pilzi.service.services.impl;
 
 import io.github.pilzi.database.domain.EventEntity;
 import io.github.pilzi.database.domain.SeasonEntity;
-import io.github.pilzi.database.utils.HibernateSessionFactoryUtil;
 import io.github.pilzi.database.workers.EventWorker;
 import io.github.pilzi.database.workers.SeasonWorker;
 import io.github.pilzi.henrikdev.beans.Season;
 import io.github.pilzi.henrikdev.service.RestService;
 import io.github.pilzi.henrikdev.service.impl.RestServiceImpl;
+import io.github.pilzi.service.services.HibernateSessionFactoryService;
 import io.github.pilzi.service.services.ImportService;
 import io.github.pilzi.service.utils.PremierImportHelperUtil;
 import org.hibernate.Session;
@@ -32,11 +32,16 @@ public class ImportServiceImpl implements ImportService {
     private final SeasonWorker seasonWorker;
 
     @NonNull
+    private final HibernateSessionFactoryService hibernateSessionFactoryService;
+
+    @NonNull
     private final EventWorker eventWorker;
 
     public ImportServiceImpl(@NonNull SeasonWorker seasonWorker,
+                             @NonNull HibernateSessionFactoryService hibernateSessionFactoryService,
                              @NonNull EventWorker eventWorker) {
         this.seasonWorker = seasonWorker;
+        this.hibernateSessionFactoryService = hibernateSessionFactoryService;
         this.eventWorker = eventWorker;
     }
 
@@ -45,7 +50,7 @@ public class ImportServiceImpl implements ImportService {
         RestService restService = new RestServiceImpl(DOTENV.get(HENRIKDEV_API_KEY_ENV), DOTENV.get(VALORANT_REGION_ENV));
 
         List<Season> seasons = restService.getSeasons().data();
-        SessionFactory sessionFactory = HibernateSessionFactoryUtil.get();
+        SessionFactory sessionFactory = hibernateSessionFactoryService.get();
         try (Session session = sessionFactory.openSession()) {
             Transaction transaction = session.beginTransaction();
 
@@ -112,8 +117,8 @@ public class ImportServiceImpl implements ImportService {
 
             persistAll(session, eventsToPersist);
 
-            transaction.commit();
             session.flush();
+            transaction.commit();
         }
     }
 

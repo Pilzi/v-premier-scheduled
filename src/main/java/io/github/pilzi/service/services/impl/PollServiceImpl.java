@@ -1,12 +1,12 @@
 package io.github.pilzi.service.services.impl;
 
 import io.github.pilzi.database.domain.*;
-import io.github.pilzi.database.utils.HibernateSessionFactoryUtil;
 import io.github.pilzi.database.workers.ActivePollEventReferenceWorker;
 import io.github.pilzi.database.workers.ActivePollVoteWorker;
 import io.github.pilzi.database.workers.EventWorker;
 import io.github.pilzi.database.workers.GuildWorker;
 import io.github.pilzi.discord.utils.Message.PollUtil;
+import io.github.pilzi.service.services.HibernateSessionFactoryService;
 import io.github.pilzi.service.services.PollService;
 import io.github.pilzi.service.utils.CalendarUtil;
 import net.dv8tion.jda.api.entities.Guild;
@@ -38,22 +38,27 @@ public class PollServiceImpl implements PollService {
     private final ActivePollEventReferenceWorker activePollEventReferenceWorker;
 
     @NonNull
+    private final HibernateSessionFactoryService hibernateSessionFactoryService;
+
+    @NonNull
     private final ActivePollVoteWorker activePollVoteWorker;
 
     public PollServiceImpl(@NonNull EventWorker eventWorker,
                            @NonNull GuildWorker guildWorker,
                            @NonNull ActivePollEventReferenceWorker activePollEventReferenceWorker,
+                           @NonNull HibernateSessionFactoryService hibernateSessionFactoryService,
                            @NonNull ActivePollVoteWorker activePollVoteWorker) {
         this.eventWorker = eventWorker;
         this.guildWorker = guildWorker;
         this.activePollEventReferenceWorker = activePollEventReferenceWorker;
+        this.hibernateSessionFactoryService = hibernateSessionFactoryService;
         this.activePollVoteWorker = activePollVoteWorker;
     }
 
     @Override
     public void handlePollForAllGuilds(@NonNull List<Guild> guilds) {
         Transaction transaction = null;
-        SessionFactory sessionFactory = HibernateSessionFactoryUtil.get();
+        SessionFactory sessionFactory = hibernateSessionFactoryService.get();
         try (Session session = sessionFactory.openSession()) {
             transaction = session.beginTransaction();
 
@@ -104,8 +109,9 @@ public class PollServiceImpl implements PollService {
                     }
                 }
             });
-            transaction.commit();
+
             session.flush();
+            transaction.commit();
         } catch (Exception e) {
             if (transaction != null) {
                 transaction.rollback();
@@ -119,7 +125,7 @@ public class PollServiceImpl implements PollService {
                         long answerId,
                         long messageId) {
         Transaction transaction = null;
-        SessionFactory sessionFactory = HibernateSessionFactoryUtil.get();
+        SessionFactory sessionFactory = hibernateSessionFactoryService.get();
         try (Session session = sessionFactory.openSession()) {
             transaction = session.beginTransaction();
 
@@ -143,7 +149,7 @@ public class PollServiceImpl implements PollService {
                            long answerId,
                            long messageId) {
         Transaction transaction = null;
-        SessionFactory sessionFactory = HibernateSessionFactoryUtil.get();
+        SessionFactory sessionFactory = hibernateSessionFactoryService.get();
         try (Session session = sessionFactory.openSession()) {
             transaction = session.beginTransaction();
 

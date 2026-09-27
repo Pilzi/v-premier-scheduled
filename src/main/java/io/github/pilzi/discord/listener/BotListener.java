@@ -1,8 +1,10 @@
 package io.github.pilzi.discord.listener;
 
 import io.github.pilzi.database.workers.*;
+import io.github.pilzi.service.services.HibernateSessionFactoryService;
 import io.github.pilzi.service.services.ImportService;
 import io.github.pilzi.service.services.PollService;
+import io.github.pilzi.service.services.impl.HibernateSessionFactoryServiceImpl;
 import io.github.pilzi.service.services.impl.ImportServiceImpl;
 import io.github.pilzi.service.services.impl.PollServiceImpl;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
@@ -29,7 +31,9 @@ public class BotListener extends ListenerAdapter {
     @NonNull
     private final SeasonWorker seasonWorker = new SeasonWorker();
     @NonNull
-    private final ImportService importService = new ImportServiceImpl(seasonWorker, eventWorker);
+    private final HibernateSessionFactoryService hibernateSessionFactoryService = new HibernateSessionFactoryServiceImpl();
+    @NonNull
+    private final ImportService importService = new ImportServiceImpl(seasonWorker, hibernateSessionFactoryService, eventWorker);
     @NonNull
     private final GuildWorker guildWorker = new GuildWorker();
     @NonNull
@@ -37,7 +41,7 @@ public class BotListener extends ListenerAdapter {
     @NonNull
     private final ActivePollVoteWorker activePollVoteWorker = new ActivePollVoteWorker();
     @NonNull
-    private final PollService pollService = new PollServiceImpl(eventWorker, guildWorker, activePollEventReferenceWorker, activePollVoteWorker);
+    private final PollService pollService = new PollServiceImpl(eventWorker, guildWorker, activePollEventReferenceWorker, hibernateSessionFactoryService, activePollVoteWorker);
 
     @Override
     public void onReady(@NonNull ReadyEvent event) {
@@ -54,6 +58,7 @@ public class BotListener extends ListenerAdapter {
             event.reply("Selection has been saved").setEphemeral(true).queue(); // send a message in the channel
         }
     }
+
     @Override
     public void onMessagePollVoteAdd(@NonNull MessagePollVoteAddEvent event) {
         pollService.addVote(event.getUserIdLong(), event.getAnswerId(), event.getMessageIdLong());
