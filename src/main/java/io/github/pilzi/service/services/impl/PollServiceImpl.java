@@ -5,6 +5,7 @@ import io.github.pilzi.database.workers.ActivePollEventReferenceWorker;
 import io.github.pilzi.database.workers.ActivePollVoteWorker;
 import io.github.pilzi.database.workers.EventWorker;
 import io.github.pilzi.database.workers.GuildWorker;
+import io.github.pilzi.discord.utils.GuildUtil;
 import io.github.pilzi.discord.utils.Message.PollUtil;
 import io.github.pilzi.service.services.HibernateSessionFactoryService;
 import io.github.pilzi.service.services.PollService;
@@ -22,9 +23,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static io.github.pilzi.discord.Bot.DOTENV;
-import static io.github.pilzi.discord.Bot.POLL_CHANNEL_NAME_ENV;
 
 public class PollServiceImpl implements PollService {
 
@@ -69,43 +67,24 @@ public class PollServiceImpl implements PollService {
 
                 ActivePollEntity activePollEntity = guildEntity.getActivePoll();
 
-                if (activePollEntity != null && !CalendarUtil.isInCurrentWeek(activePollEntity.getStartAt(), activePollEntity.getEndAt())) {
+                if (isActivePollExpiredOrNull(activePollEntity)) {
                     activePollEntity = null;
                     guildEntity.setActivePoll(null);
                 }
 
-                if (activePollEntity == null || activePollEntity.getMessageId() == null) {
+                if (doesActivePollNotExist(activePollEntity)) {
                     ActivePollEntity newCreatedActivePollEntity = new ActivePollEntity(CalendarUtil.getFirstInstantOfCurrentWeek(),
                             CalendarUtil.getLastInstantOfCurrentWeek(),
                             guildEntity);
                     session.persist(newCreatedActivePollEntity);
                     guildEntity.setActivePoll(newCreatedActivePollEntity);
-                    AtomicInteger orderIndex = new AtomicInteger(1);
-                    eventsInCurrentWeek.stream()
-                            .sorted(Comparator.comparing(EventEntity::getStartAt))
-                            .map((eventInCurrentWeek) -> {
-                                int orderIndexValue = orderIndex.get();
-                                orderIndex.set(orderIndexValue + 1);
-                                return new ActivePollEventReferenceEntity(newCreatedActivePollEntity, eventInCurrentWeek, orderIndexValue);
-                            })
-                            .forEach(session::persist);
 
-                    Optional<GuildChannel> guildChannelOptional = guild.getChannels().stream()
-                            .filter(channel -> channel.getName().equals(DOTENV.get(POLL_CHANNEL_NAME_ENV)))
-                            .findFirst();
+                    eventsInCurrentWeekToPollEventReferences(eventsInCurrentWeek, newCreatedActivePollEntity, session);
+
+                    Optional<GuildChannel> guildChannelOptional = GuildUtil.findChannelInGuild(guild);
 
                     if (guildChannelOptional.isPresent()) {
-                        GuildChannel guildChannel = guildChannelOptional.get();
-
-                        String channelId = guildChannel.getId();
-                        TextChannel textChannel = guildChannel.getGuild().getTextChannelById(channelId);
-                        if (textChannel != null) {
-                            Message sentMessage = textChannel.sendMessage("")
-                                    .setPoll(PollUtil.buildEventPoll(eventsInCurrentWeek.getFirst().getMap(), eventsInCurrentWeek))
-                                    .complete();
-
-                            newCreatedActivePollEntity.setMessageId(sentMessage.getIdLong());
-                        }
+                        sendPoll(guildChannelOptional.get(), eventsInCurrentWeek, newCreatedActivePollEntity);
                     }
                 }
             });
@@ -117,6 +96,53 @@ public class PollServiceImpl implements PollService {
                 transaction.rollback();
             }
             throw e;
+        }
+    }
+
+    /**
+     * Gives each {@link ActivePollEventReferenceEntity} an increasing index
+     * based on time, so the earliest event comes first. This allows us to
+     * tell the poll choices apart when saving them via Hibernate.
+     *
+     * @param eventsInCurrentWeek        All event entities for the current week
+     * @param newCreatedActivePollEntity The poll object currently being created
+     * @param session                    The active Hibernate session
+     */
+    private static void eventsInCurrentWeekToPollEventReferences(@NonNull List<EventEntity> eventsInCurrentWeek,
+                                                                 @NonNull ActivePollEntity newCreatedActivePollEntity,
+                                                                 @NonNull Session session) {
+        AtomicInteger orderIndex = new AtomicInteger(1);
+
+        eventsInCurrentWeek.stream()
+                .sorted(Comparator.comparing(EventEntity::getStartAt))
+                .map((eventInCurrentWeek) -> {
+                    int orderIndexValue = orderIndex.get();
+                    orderIndex.set(orderIndexValue + 1);
+                    return new ActivePollEventReferenceEntity(newCreatedActivePollEntity, eventInCurrentWeek, orderIndexValue);
+                })
+                .forEach(session::persist);
+    }
+
+    private static boolean doesActivePollNotExist(ActivePollEntity activePollEntity) {
+        return activePollEntity == null || activePollEntity.getMessageId() == null;
+    }
+
+    private static boolean isActivePollExpiredOrNull(ActivePollEntity activePollEntity) {
+        return activePollEntity != null && !CalendarUtil.isInCurrentWeek(activePollEntity.getStartAt(), activePollEntity.getEndAt());
+    }
+
+
+    private static void sendPoll(@NonNull GuildChannel guildChannel,
+                                 List<EventEntity> eventsInCurrentWeek,
+                                 ActivePollEntity newCreatedActivePollEntity) {
+        String channelId = guildChannel.getId();
+        TextChannel textChannel = guildChannel.getGuild().getTextChannelById(channelId);
+        if (textChannel != null) {
+            Message sentMessage = textChannel.sendMessage("")
+                    .setPoll(PollUtil.buildEventPoll(eventsInCurrentWeek.getFirst().getMap(), eventsInCurrentWeek))
+                    .complete();
+
+            newCreatedActivePollEntity.setMessageId(sentMessage.getIdLong());
         }
     }
 
