@@ -49,10 +49,11 @@ public class PollUtil {
                     pollBuilder.addAnswer(text.substring(0, Math.min(text.length(), 80)));
                 });
 
+        pollBuilder.addAnswer("Count me out");
+
     return pollBuilder
             .setMultiAnswer(true)
             .setDuration(Duration.ofDays(DEFAULT_POLL_DURATION_DAYS))
             .build();
     }
-
 }
