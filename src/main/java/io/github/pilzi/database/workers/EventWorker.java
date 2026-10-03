@@ -7,8 +7,6 @@ import org.hibernate.Session;
 import org.hibernate.query.Query;
 import org.jspecify.annotations.NonNull;
 
-import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,15 +31,7 @@ public class EventWorker {
     @NonNull
     public List<EventEntity> collectEventsForCurrentWeek(@NonNull Session session) {
         return new ArrayList<>(this.getAll(session).stream()
-                .filter(this::isEventInCurrentWeek)
+                .filter(eventEntity -> CalendarUtil.isInCurrentWeek(eventEntity.getStartAt(), eventEntity.getEndAt()))
                 .toList());
-        }
-
-        private boolean isEventInCurrentWeek(@NonNull EventEntity event) {
-            LocalDate firstDayOfCurrentWeek = CalendarUtil.getFirstDayOfCurrentWeek();
-            LocalDate lastDayOfCurrentWeek = CalendarUtil.getLastDayOfCurrentWeek();
-
-            return LocalDate.ofInstant(event.getStartAt(), ZoneId.systemDefault()).isAfter(firstDayOfCurrentWeek)
-                    && LocalDate.ofInstant(event.getEndAt(), ZoneId.systemDefault()).isBefore(lastDayOfCurrentWeek);
         }
     }

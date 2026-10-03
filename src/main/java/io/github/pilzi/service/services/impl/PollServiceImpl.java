@@ -128,7 +128,7 @@ public class PollServiceImpl implements PollService {
     }
 
     private static boolean isActivePollExpiredOrNull(ActivePollEntity activePollEntity) {
-        return activePollEntity != null && !CalendarUtil.isInCurrentWeek(activePollEntity.getStartAt(), activePollEntity.getEndAt());
+        return activePollEntity != null && !CalendarUtil.doesMatchWeekBounds(activePollEntity.getStartAt(), activePollEntity.getEndAt());
     }
 
 
