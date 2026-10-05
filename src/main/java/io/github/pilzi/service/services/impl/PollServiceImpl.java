@@ -1,6 +1,7 @@
 package io.github.pilzi.service.services.impl;
 
 import io.github.pilzi.database.domain.*;
+import io.github.pilzi.database.utils.TransactionalUtil;
 import io.github.pilzi.database.workers.ActivePollEventReferenceWorker;
 import io.github.pilzi.database.workers.ActivePollVoteWorker;
 import io.github.pilzi.database.workers.EventWorker;
@@ -15,8 +16,6 @@ import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import org.hibernate.Session;
-import org.hibernate.SessionFactory;
-import org.hibernate.Transaction;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Comparator;
@@ -55,11 +54,7 @@ public class PollServiceImpl implements PollService {
 
     @Override
     public void handlePollForAllGuilds(@NonNull List<Guild> guilds) {
-        Transaction transaction = null;
-        SessionFactory sessionFactory = hibernateSessionFactoryService.get();
-        try (Session session = sessionFactory.openSession()) {
-            transaction = session.beginTransaction();
-
+        TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             List<EventEntity> eventsInCurrentWeek = eventWorker.collectEventsForCurrentWeek(session);
 
             guilds.forEach(guild -> {
@@ -88,15 +83,7 @@ public class PollServiceImpl implements PollService {
                     }
                 }
             });
-
-            session.flush();
-            transaction.commit();
-        } catch (Exception e) {
-            if (transaction != null) {
-                transaction.rollback();
-            }
-            throw e;
-        }
+        });
     }
 
     /**
@@ -150,46 +137,25 @@ public class PollServiceImpl implements PollService {
     public void addVote(long userId,
                         long answerId,
                         long messageId) {
-        Transaction transaction = null;
-        SessionFactory sessionFactory = hibernateSessionFactoryService.get();
-        try (Session session = sessionFactory.openSession()) {
-            transaction = session.beginTransaction();
-
+        TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             ActivePollEventReferenceEntity activePollEventReferenceEntity = activePollEventReferenceWorker.findByMessageIdAndIndex(session, messageId, answerId);
 
             if (activePollEventReferenceEntity != null) {
                 session.persist(new ActivePollVoteEntity(userId, activePollEventReferenceEntity));
             }
-
-            transaction.commit();
-        } catch (Exception e) {
-            if (transaction != null) {
-                transaction.rollback();
-            }
-            throw e;
-        }
+        });
     }
 
     @Override
     public void removeVote(long userId,
                            long answerId,
                            long messageId) {
-        Transaction transaction = null;
-        SessionFactory sessionFactory = hibernateSessionFactoryService.get();
-        try (Session session = sessionFactory.openSession()) {
-            transaction = session.beginTransaction();
-
+        TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             ActivePollVoteEntity activePollVoteEntity = activePollVoteWorker.find(session, answerId, messageId, userId);
 
             if (activePollVoteEntity != null) {
                 session.remove(activePollVoteEntity);
             }
-            transaction.commit();
-        } catch (Exception e) {
-            if (transaction != null) {
-                transaction.rollback();
-            }
-            throw e;
-        }
+        });
     }
 }

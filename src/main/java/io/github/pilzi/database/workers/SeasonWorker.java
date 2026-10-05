@@ -26,4 +26,9 @@ public class SeasonWorker {
         entityToUpdate.setStartAt(entityToUpdateWith.getStartAt());
         entityToUpdate.setEndAt(entityToUpdateWith.getEndAt());
     }
+
+    public void deleteAll(@NonNull Session session) {
+        Query query = session.createQuery("DELETE SeasonEntity");
+        query.executeUpdate();
+    }
 }

@@ -2,6 +2,7 @@ package io.github.pilzi.service.services.impl;
 
 import io.github.pilzi.database.domain.EventEntity;
 import io.github.pilzi.database.domain.SeasonEntity;
+import io.github.pilzi.database.utils.TransactionalUtil;
 import io.github.pilzi.database.workers.EventWorker;
 import io.github.pilzi.database.workers.SeasonWorker;
 import io.github.pilzi.henrikdev.beans.Season;
@@ -11,8 +12,6 @@ import io.github.pilzi.service.services.HibernateSessionFactoryService;
 import io.github.pilzi.service.services.ImportService;
 import io.github.pilzi.service.utils.PremierImportHelperUtil;
 import org.hibernate.Session;
-import org.hibernate.SessionFactory;
-import org.hibernate.Transaction;
 import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
@@ -50,11 +49,8 @@ public class ImportServiceImpl implements ImportService {
         RestService restService = new RestServiceImpl(DOTENV.get(HENRIKDEV_API_KEY_ENV), DOTENV.get(VALORANT_REGION_ENV));
 
         List<Season> seasons = restService.getSeasons().data();
-        SessionFactory sessionFactory = hibernateSessionFactoryService.get();
 
-        try (Session session = sessionFactory.openSession()) {
-            Transaction transaction = session.beginTransaction();
-
+        TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             List<SeasonEntity> seasonEntities = PremierImportHelperUtil.toSeasonEntity(seasons);
 
             List<SeasonEntity> managedSeasonEntities = importSeasonEntities(seasonEntities, session);
@@ -64,10 +60,7 @@ public class ImportServiceImpl implements ImportService {
             importEventEntities(eventEntities,
                     managedSeasonEntities,
                     session);
-
-            session.flush();
-            transaction.commit();
-        }
+        });
     }
 
     /**

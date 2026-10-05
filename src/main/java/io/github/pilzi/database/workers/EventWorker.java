@@ -33,5 +33,10 @@ public class EventWorker {
         return new ArrayList<>(this.getAll(session).stream()
                 .filter(eventEntity -> CalendarUtil.isInCurrentWeek(eventEntity.getStartAt(), eventEntity.getEndAt()))
                 .toList());
-        }
     }
+
+    public void deleteAll(@NonNull Session session) {
+        Query query = session.createQuery("DELETE EventEntity");
+        query.executeUpdate();
+    }
+}

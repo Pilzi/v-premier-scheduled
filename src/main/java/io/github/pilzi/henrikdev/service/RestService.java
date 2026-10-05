@@ -14,5 +14,4 @@ public interface RestService {
      * @return A {@link Response} containing the {@link Season} schedules.
      */
     Response<Season> getSeasons();
-
 }
