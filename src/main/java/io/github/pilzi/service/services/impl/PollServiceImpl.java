@@ -17,6 +17,7 @@ import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import org.hibernate.Session;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Comparator;
 import java.util.List;
@@ -53,7 +54,7 @@ public class PollServiceImpl implements PollService {
     }
 
     @Override
-    public void handlePollForAllGuilds(@NonNull List<Guild> guilds) {
+    public void handleSchedulingPollForAllGuilds(@NonNull List<Guild> guilds) {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             List<EventEntity> eventsInCurrentWeek = eventWorker.collectEventsForCurrentWeek(session);
 
@@ -110,18 +111,18 @@ public class PollServiceImpl implements PollService {
                 .forEach(session::persist);
     }
 
-    private static boolean doesActivePollNotExist(ActivePollEntity activePollEntity) {
+    private static boolean doesActivePollNotExist(@Nullable ActivePollEntity activePollEntity) {
         return activePollEntity == null || activePollEntity.getMessageId() == null;
     }
 
-    private static boolean isActivePollExpiredOrNull(ActivePollEntity activePollEntity) {
+    private static boolean isActivePollExpiredOrNull(@Nullable ActivePollEntity activePollEntity) {
         return activePollEntity != null && !CalendarUtil.doesMatchWeekBounds(activePollEntity.getStartAt(), activePollEntity.getEndAt());
     }
 
 
     private static void sendPoll(@NonNull GuildChannel guildChannel,
-                                 List<EventEntity> eventsInCurrentWeek,
-                                 ActivePollEntity newCreatedActivePollEntity) {
+                                 @NonNull List<EventEntity> eventsInCurrentWeek,
+                                 @NonNull ActivePollEntity newCreatedActivePollEntity) {
         String channelId = guildChannel.getId();
         TextChannel textChannel = guildChannel.getGuild().getTextChannelById(channelId);
         if (textChannel != null) {
