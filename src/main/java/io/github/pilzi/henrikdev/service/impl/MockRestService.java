@@ -16,7 +16,8 @@ public class MockRestService implements RestService {
     @NonNull
     public static final String SEASON_MOCK_JSON = "/season-mock.json";
     @NonNull
-    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule());
 
     @NonNull
     @Override
