@@ -26,7 +26,7 @@ public class PremierImportHelperUtil {
         return seasons.stream().map(season -> new SeasonEntity(
                         season.id(),
                         season.startsAt(),
-                        season.startsAt()
+                        season.endsAt()
                 ))
                 .toList();
     }

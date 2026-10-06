@@ -11,6 +11,7 @@ import java.util.Objects;
 @Entity
 @Table(name = "event")
 public class EventEntity {
+    @Nullable
     @Id
     @GeneratedValue(strategy = GenerationType.TABLE)
     private Long id;
@@ -37,13 +38,14 @@ public class EventEntity {
     private Conference conference;
 
     @Nullable
-    @ManyToOne(cascade = CascadeType.ALL)
+    @ManyToOne()
     @JoinColumn(name = "season_id", referencedColumnName = "id", nullable = false)
     private SeasonEntity season;
 
     public EventEntity(@NonNull String map,
                        @NonNull Instant startAt,
-                       @NonNull Instant endAt, @NonNull Boolean isPractice,
+                       @NonNull Instant endAt,
+                       @NonNull Boolean isPractice,
                        @NonNull Conference conference,
                        @NonNull SeasonEntity season) {
         this.map = map;
@@ -67,7 +69,7 @@ public class EventEntity {
 
     @Override
     public int hashCode() {
-        return Objects.hash(map, startAt, endAt, isPractice, conference, season);
+        return Objects.hash(map, startAt, endAt, isPractice, conference, season.getExternalId());
     }
 
     protected EventEntity() {

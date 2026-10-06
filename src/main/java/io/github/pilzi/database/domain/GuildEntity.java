@@ -8,7 +8,6 @@ import org.jspecify.annotations.Nullable;
 @Entity
 @Table(name = "guild")
 public class GuildEntity {
-
     @Nullable
     @Id
     @GeneratedValue(strategy = GenerationType.TABLE)

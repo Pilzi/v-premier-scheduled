@@ -9,6 +9,7 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class EventWorker {
 
@@ -38,5 +39,28 @@ public class EventWorker {
     public void deleteAll(@NonNull Session session) {
         Query query = session.createQuery("DELETE EventEntity");
         query.executeUpdate();
+    }
+
+    public void persist(@NonNull Session session, @NonNull EventEntity eventEntity) {
+        session.persist(eventEntity);
+    }
+
+    @NonNull
+    public Optional<EventEntity> getFirst(@NonNull Session session) {
+        return session.createQuery("FROM EventEntity ", EventEntity.class)
+                .setMaxResults(1)
+                .uniqueResultOptional();
+    }
+
+    @NonNull
+    public Long count(@NonNull Session session) {
+        return session.createQuery("SELECT COUNT(event) FROM EventEntity event", Long.class)
+                .getSingleResult();
+    }
+
+    public Optional<EventEntity> find(@NonNull Session session, @NonNull Long entityId) {
+        return Optional.ofNullable(session.createQuery("SELECT event FROM EventEntity event WHERE event.id = :searchedId", EventEntity.class)
+                .setParameter("searchedId", entityId)
+                .getSingleResultOrNull());
     }
 }
