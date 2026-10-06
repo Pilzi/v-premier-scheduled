@@ -7,7 +7,6 @@ import io.github.pilzi.database.workers.EventWorker;
 import io.github.pilzi.database.workers.SeasonWorker;
 import io.github.pilzi.henrikdev.beans.Season;
 import io.github.pilzi.henrikdev.service.RestService;
-import io.github.pilzi.henrikdev.service.impl.RestServiceImpl;
 import io.github.pilzi.service.services.HibernateSessionFactoryService;
 import io.github.pilzi.service.services.ImportService;
 import io.github.pilzi.service.utils.PremierImportHelperUtil;
@@ -18,14 +17,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import static io.github.pilzi.discord.Bot.DOTENV;
-
 public class ImportServiceImpl implements ImportService {
 
     @NonNull
     public static final String HENRIKDEV_API_KEY_ENV = "HENRIKDEV_API_KEY";
     @NonNull
     public static final String VALORANT_REGION_ENV = "VALORANT_REGION";
+
+    @NonNull
+    private final RestService restService;
 
     @NonNull
     private final SeasonWorker seasonWorker;
@@ -36,9 +36,11 @@ public class ImportServiceImpl implements ImportService {
     @NonNull
     private final EventWorker eventWorker;
 
-    public ImportServiceImpl(@NonNull SeasonWorker seasonWorker,
+    public ImportServiceImpl(@NonNull RestService restService,
+                             @NonNull SeasonWorker seasonWorker,
                              @NonNull HibernateSessionFactoryService hibernateSessionFactoryService,
                              @NonNull EventWorker eventWorker) {
+        this.restService = restService;
         this.seasonWorker = seasonWorker;
         this.hibernateSessionFactoryService = hibernateSessionFactoryService;
         this.eventWorker = eventWorker;
@@ -46,8 +48,6 @@ public class ImportServiceImpl implements ImportService {
 
     @Override
     public void importPremierData() {
-        RestService restService = new RestServiceImpl(DOTENV.get(HENRIKDEV_API_KEY_ENV), DOTENV.get(VALORANT_REGION_ENV));
-
         List<Season> seasons = restService.getSeasons().data();
 
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {

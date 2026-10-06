@@ -6,6 +6,7 @@ import io.github.pilzi.database.utils.TransactionalUtil;
 import io.github.pilzi.database.workers.EventWorker;
 import io.github.pilzi.database.workers.SeasonWorker;
 import io.github.pilzi.henrikdev.enums.Conference;
+import io.github.pilzi.henrikdev.service.impl.MockRestService;
 import io.github.pilzi.service.services.HibernateSessionFactoryService;
 import io.github.pilzi.service.services.ImportService;
 import io.github.pilzi.service.services.impl.HibernateSessionFactoryTestServiceImpl;
@@ -35,7 +36,7 @@ public class ImportPremiereDataTest extends TestContainer {
 
     ImportPremiereDataTest() {
         hibernateSessionFactoryService = new HibernateSessionFactoryTestServiceImpl(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
-        importService = new ImportServiceImpl(new SeasonWorker(), hibernateSessionFactoryService, eventWorker);
+        importService = new ImportServiceImpl(new MockRestService(), new SeasonWorker(), hibernateSessionFactoryService, eventWorker);
         importService.importPremierData();
     }
 
@@ -179,7 +180,7 @@ public class ImportPremiereDataTest extends TestContainer {
         importService.importPremierData();
 
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
-            Assert.assertEquals( seasonCountBeforeRemove.get(), seasonWorker.count(session));
+            Assert.assertEquals(seasonCountBeforeRemove.get(), seasonWorker.count(session));
         });
     }
 
@@ -204,7 +205,7 @@ public class ImportPremiereDataTest extends TestContainer {
         importService.importPremierData();
 
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
-            Assert.assertEquals( eventCountBeforeRemove.get(), eventWorker.count(session));
+            Assert.assertEquals(eventCountBeforeRemove.get(), eventWorker.count(session));
         });
     }
 
@@ -250,7 +251,6 @@ public class ImportPremiereDataTest extends TestContainer {
         importService.importPremierData();
 
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
-
             SeasonEntity matchingEntity = seasonWorker.find(session, seasonId.get()).orElseThrow();
             Assertions.assertEquals(initialStartAt.get(), matchingEntity.getStartAt());
         });

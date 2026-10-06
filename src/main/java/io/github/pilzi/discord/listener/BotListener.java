@@ -1,6 +1,8 @@
 package io.github.pilzi.discord.listener;
 
 import io.github.pilzi.database.workers.*;
+import io.github.pilzi.henrikdev.service.RestService;
+import io.github.pilzi.henrikdev.service.impl.RestServiceImpl;
 import io.github.pilzi.service.services.HibernateSessionFactoryService;
 import io.github.pilzi.service.services.ImportService;
 import io.github.pilzi.service.services.PollService;
@@ -19,6 +21,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import static io.github.pilzi.discord.Bot.DOTENV;
+import static io.github.pilzi.service.services.impl.ImportServiceImpl.HENRIKDEV_API_KEY_ENV;
+import static io.github.pilzi.service.services.impl.ImportServiceImpl.VALORANT_REGION_ENV;
+
 public class BotListener extends ListenerAdapter {
     @NonNull
     public static final String AGENDA_SUBMIT = "agenda-submit";
@@ -33,7 +39,9 @@ public class BotListener extends ListenerAdapter {
     @NonNull
     private final HibernateSessionFactoryService hibernateSessionFactoryService = new HibernateSessionFactoryServiceImpl();
     @NonNull
-    private final ImportService importService = new ImportServiceImpl(seasonWorker, hibernateSessionFactoryService, eventWorker);
+    private final RestService restService = new RestServiceImpl(DOTENV.get(HENRIKDEV_API_KEY_ENV), DOTENV.get(VALORANT_REGION_ENV));
+    @NonNull
+    private final ImportService importService = new ImportServiceImpl(restService, seasonWorker, hibernateSessionFactoryService, eventWorker);
     @NonNull
     private final GuildWorker guildWorker = new GuildWorker();
     @NonNull
