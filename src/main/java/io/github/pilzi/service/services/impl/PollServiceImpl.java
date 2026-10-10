@@ -1,12 +1,11 @@
 package io.github.pilzi.service.services.impl;
 
 import io.github.pilzi.database.domain.*;
+import io.github.pilzi.database.enums.PollType;
 import io.github.pilzi.database.utils.TransactionalUtil;
-import io.github.pilzi.database.workers.ActivePollEventReferenceWorker;
-import io.github.pilzi.database.workers.ActivePollVoteWorker;
-import io.github.pilzi.database.workers.EventWorker;
-import io.github.pilzi.database.workers.GuildWorker;
+import io.github.pilzi.database.workers.*;
 import io.github.pilzi.discord.utils.GuildUtil;
+import io.github.pilzi.discord.utils.Message.DropdownUtil;
 import io.github.pilzi.discord.utils.Message.PollUtil;
 import io.github.pilzi.service.services.HibernateSessionFactoryService;
 import io.github.pilzi.service.services.PollService;
@@ -33,6 +32,9 @@ public class PollServiceImpl implements PollService {
     private final GuildWorker guildWorker;
 
     @NonNull
+    private final ActivePollWorker activePollWorker;
+
+    @NonNull
     private final ActivePollEventReferenceWorker activePollEventReferenceWorker;
 
     @NonNull
@@ -43,44 +45,81 @@ public class PollServiceImpl implements PollService {
 
     public PollServiceImpl(@NonNull EventWorker eventWorker,
                            @NonNull GuildWorker guildWorker,
+                           @NonNull ActivePollWorker activePollWorker,
                            @NonNull ActivePollEventReferenceWorker activePollEventReferenceWorker,
                            @NonNull HibernateSessionFactoryService hibernateSessionFactoryService,
                            @NonNull ActivePollVoteWorker activePollVoteWorker) {
         this.eventWorker = eventWorker;
         this.guildWorker = guildWorker;
+        this.activePollWorker = activePollWorker;
         this.activePollEventReferenceWorker = activePollEventReferenceWorker;
         this.hibernateSessionFactoryService = hibernateSessionFactoryService;
         this.activePollVoteWorker = activePollVoteWorker;
     }
 
     @Override
-    public void handleSchedulingPollForAllGuilds(@NonNull List<Guild> guilds) {
+    public void handlePollsForGuilds(@NonNull List<Guild> guilds) {
+        handleScheduledPollForAllGuilds(guilds);
+        handleAgentPollForAllGuilds(guilds);
+    }
+
+    private void handleScheduledPollForAllGuilds(@NonNull List<Guild> guilds) {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             List<EventEntity> eventsInCurrentWeek = eventWorker.collectEventsForCurrentWeek(session);
 
             guilds.forEach(guild -> {
                 GuildEntity guildEntity = guildWorker.getOrCreate(session, guild);
+                ActivePollEntity activePollEntity = activePollWorker.getScheduledActivePoll(session, guild.getIdLong());
 
-                ActivePollEntity activePollEntity = guildEntity.getActivePoll();
-
-                if (isActivePollExpiredOrNull(activePollEntity)) {
+                if (isActivePollExpired(activePollEntity)) {
+                    session.remove(activePollEntity);
                     activePollEntity = null;
-                    guildEntity.setActivePoll(null);
                 }
 
                 if (doesActivePollNotExist(activePollEntity)) {
                     ActivePollEntity newCreatedActivePollEntity = new ActivePollEntity(CalendarUtil.getFirstInstantOfCurrentWeek(),
                             CalendarUtil.getLastInstantOfCurrentWeek(),
+                            PollType.SCHEDULE,
                             guildEntity);
                     session.persist(newCreatedActivePollEntity);
-                    guildEntity.setActivePoll(newCreatedActivePollEntity);
 
                     eventsInCurrentWeekToPollEventReferences(eventsInCurrentWeek, newCreatedActivePollEntity, session);
 
                     Optional<GuildChannel> guildChannelOptional = GuildUtil.findChannelInGuild(guild);
 
                     if (guildChannelOptional.isPresent()) {
-                        sendPoll(guildChannelOptional.get(), eventsInCurrentWeek, newCreatedActivePollEntity);
+                        sendScheduledPoll(guildChannelOptional.get(), eventsInCurrentWeek, newCreatedActivePollEntity);
+                    }
+                }
+            });
+        });
+    }
+
+    private void handleAgentPollForAllGuilds(@NonNull List<Guild> guilds) {
+        TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
+            List<EventEntity> eventsInCurrentWeek = eventWorker.collectEventsForCurrentWeek(session);
+
+            guilds.forEach(guild -> {
+                GuildEntity guildEntity = guildWorker.getOrCreate(session, guild);
+                ActivePollEntity activeAgentPollEntity = activePollWorker.getAgentActivePoll(session, guild.getIdLong());
+
+                if (isActivePollExpired(activeAgentPollEntity)) {
+                    session.remove(activeAgentPollEntity);
+                    activeAgentPollEntity = null;
+                }
+
+                if (doesActivePollNotExist(activeAgentPollEntity)) {
+                    ActivePollEntity newCreatedActivePollEntity = new ActivePollEntity(CalendarUtil.getFirstInstantOfCurrentWeek(),
+                            CalendarUtil.getLastInstantOfCurrentWeek(),
+                            PollType.AGENT,
+                            guildEntity);
+                    session.persist(newCreatedActivePollEntity);
+
+
+                    Optional<GuildChannel> guildChannelOptional = GuildUtil.findChannelInGuild(guild);
+
+                    if (guildChannelOptional.isPresent()) {
+                        sendAgentPoll(guildChannelOptional.get(), eventsInCurrentWeek, newCreatedActivePollEntity);
                     }
                 }
             });
@@ -115,23 +154,46 @@ public class PollServiceImpl implements PollService {
         return activePollEntity == null || activePollEntity.getMessageId() == null;
     }
 
-    private static boolean isActivePollExpiredOrNull(@Nullable ActivePollEntity activePollEntity) {
+    private static boolean isActivePollExpired(@Nullable ActivePollEntity activePollEntity) {
         return activePollEntity != null && !CalendarUtil.doesMatchWeekBounds(activePollEntity.getStartAt(), activePollEntity.getEndAt());
     }
 
 
-    private static void sendPoll(@NonNull GuildChannel guildChannel,
-                                 @NonNull List<EventEntity> eventsInCurrentWeek,
-                                 @NonNull ActivePollEntity newCreatedActivePollEntity) {
+    private static void sendScheduledPoll(@NonNull GuildChannel guildChannel,
+                                          @NonNull List<EventEntity> eventsInCurrentWeek,
+                                          @NonNull ActivePollEntity newCreatedActivePollEntity) {
         String channelId = guildChannel.getId();
         TextChannel textChannel = guildChannel.getGuild().getTextChannelById(channelId);
         if (textChannel != null) {
             Message sentMessage = textChannel.sendMessage("")
-                    .setPoll(PollUtil.buildEventPoll(eventsInCurrentWeek.getFirst().getMap(), eventsInCurrentWeek))
+                    .setPoll(PollUtil.buildEventPoll(getMap(eventsInCurrentWeek), eventsInCurrentWeek))
                     .complete();
 
             newCreatedActivePollEntity.setMessageId(sentMessage.getIdLong());
         }
+    }
+
+    private static void sendAgentPoll(@NonNull GuildChannel guildChannel,
+                                      @NonNull List<EventEntity> eventsInCurrentWeek,
+                                      @NonNull ActivePollEntity newCreatedActivePollEntity) {
+        String channelId = guildChannel.getId();
+        TextChannel textChannel = guildChannel.getGuild().getTextChannelById(channelId);
+        if (textChannel != null) {
+            String text = "## ⚔\uFE0F Agent Selection\n" +
+                    "Which agents would you like to play on " +
+                    "**" + getMap(eventsInCurrentWeek) + "**?\n" +
+                    "\u200B";
+
+            Message sentMessage = textChannel.sendMessage(text)
+                    .addComponents(DropdownUtil.buildAgendActionRows())
+                    .complete();
+
+            newCreatedActivePollEntity.setMessageId(sentMessage.getIdLong());
+        }
+    }
+
+    private static @NonNull String getMap(@NonNull List<EventEntity> eventsInCurrentWeek) {
+        return eventsInCurrentWeek.getFirst().getMap();
     }
 
     @Override

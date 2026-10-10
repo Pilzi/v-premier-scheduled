@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-
 @Entity
 @Table(name = "guild")
 public class GuildEntity {
@@ -21,17 +20,14 @@ public class GuildEntity {
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 
-    @Nullable
-    @OneToOne(mappedBy = "guild", cascade = CascadeType.ALL, orphanRemoval = true)
-    private ActivePollEntity activePoll;
-
     public GuildEntity(@NonNull String discordId,
                        @NonNull String name) {
         this.discordId = discordId;
         this.name = name;
     }
 
-    protected GuildEntity(){}
+    protected GuildEntity() {
+    }
 
     public @NonNull String getDiscordId() {
         return discordId;
@@ -47,13 +43,5 @@ public class GuildEntity {
 
     public void setName(@NonNull String name) {
         this.name = name;
-    }
-
-    public @Nullable ActivePollEntity getActivePoll() {
-        return activePoll;
-    }
-
-    public void setActivePoll(@Nullable ActivePollEntity activePoll) {
-        this.activePoll = activePoll;
     }
 }

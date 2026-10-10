@@ -37,6 +37,8 @@ public class BotListener extends ListenerAdapter {
     @NonNull
     private final SeasonWorker seasonWorker = new SeasonWorker();
     @NonNull
+    private final ActivePollWorker activePollWorker = new ActivePollWorker();
+    @NonNull
     private final HibernateSessionFactoryService hibernateSessionFactoryService = new HibernateSessionFactoryServiceImpl();
     @NonNull
     private final RestService restService = new RestServiceImpl(DOTENV.get(HENRIKDEV_API_KEY_ENV), DOTENV.get(VALORANT_REGION_ENV));
@@ -49,7 +51,7 @@ public class BotListener extends ListenerAdapter {
     @NonNull
     private final ActivePollVoteWorker activePollVoteWorker = new ActivePollVoteWorker();
     @NonNull
-    private final PollService pollService = new PollServiceImpl(eventWorker, guildWorker, activePollEventReferenceWorker, hibernateSessionFactoryService, activePollVoteWorker);
+    private final PollService pollService = new PollServiceImpl(eventWorker, guildWorker, activePollWorker, activePollEventReferenceWorker, hibernateSessionFactoryService, activePollVoteWorker);
 
     @Override
     public void onReady(@NonNull ReadyEvent event) {
@@ -57,7 +59,7 @@ public class BotListener extends ListenerAdapter {
         scheduler.scheduleAtFixedRate(importService::importPremierData, SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.HOURS);
 
         // Check if there is an active poll for the next event week
-        scheduler.scheduleAtFixedRate(() -> pollService.handlePollForAllGuilds(event.getJDA().getGuilds()), SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.HOURS);
+        scheduler.scheduleAtFixedRate(() -> pollService.handlePollsForGuilds(event.getJDA().getGuilds()), SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.HOURS);
     }
 
     @Override

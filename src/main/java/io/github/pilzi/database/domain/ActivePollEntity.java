@@ -1,6 +1,9 @@
 package io.github.pilzi.database.domain;
 
+import io.github.pilzi.database.enums.PollType;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -27,19 +30,28 @@ public class ActivePollEntity {
     private Long messageId;
 
     @NonNull
-    @OneToOne
-    @JoinColumn(name = "guild_id", nullable = false, unique = true)
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "poll_type", nullable = false)
+    private PollType pollType;
+
+    @NonNull
+    @ManyToOne
+    @JoinColumn(name = "guild_id", referencedColumnName = "id", nullable = false, unique = true)
     private GuildEntity guild;
 
     public ActivePollEntity(@NonNull Instant startAt,
                             @NonNull Instant endAt,
+                            @NonNull PollType pollType,
                             @NonNull GuildEntity guild) {
         this.startAt = startAt;
         this.endAt = endAt;
+        this.pollType = pollType;
         this.guild = guild;
     }
 
-    protected ActivePollEntity() {}
+    protected ActivePollEntity() {
+    }
 
     public @NonNull Instant getStartAt() {
         return startAt;
@@ -79,5 +91,13 @@ public class ActivePollEntity {
 
     public void setId(@Nullable Long id) {
         this.id = id;
+    }
+
+    public @NonNull PollType getPollType() {
+        return pollType;
+    }
+
+    public void setPollType(@NonNull PollType pollType) {
+        this.pollType = pollType;
     }
 }

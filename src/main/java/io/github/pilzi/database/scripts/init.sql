@@ -26,15 +26,18 @@ CREATE TABLE guild
     name       VARCHAR(100)
 );
 
+CREATE TYPE poll_type AS ENUM ('SCHEDULE','AGENT');
 CREATE TABLE active_poll
 (
     id         BIGINT       NOT NULL PRIMARY KEY,
     start_at   TIMESTAMP(6) NOT NULL,
     message_id BIGINT UNIQUE,
     end_at     TIMESTAMP(6) NOT NULL,
+    poll_type       POLL_TYPE    NOT NULL,
     guild_id   BIGINT       NOT NULL
         CONSTRAINT guild_id_guild_fk
-            REFERENCES guild ON DELETE CASCADE ON UPDATE CASCADE
+            REFERENCES guild ON DELETE CASCADE ON UPDATE CASCADE,
+    UNIQUE (guild_id, poll_type)
 );
 
 CREATE TABLE active_poll_event_reference
@@ -45,7 +48,7 @@ CREATE TABLE active_poll_event_reference
     event_id       BIGINT NOT NULL
         CONSTRAINT event_id_event_fk
             REFERENCES event ON DELETE CASCADE ON UPDATE CASCADE,
-    order_index BIGINT NOT NULL,
+    order_index    BIGINT NOT NULL,
     CONSTRAINT active_poll_event_reference_pk
         PRIMARY KEY (active_poll_id, event_id),
     CONSTRAINT active_poll_event_reference_order_unique

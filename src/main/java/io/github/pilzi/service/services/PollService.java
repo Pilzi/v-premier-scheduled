@@ -7,10 +7,7 @@ import java.util.List;
 
 public interface PollService {
 
-    /**
-     *  Create a new poll when there is no existing poll for the current week.
-     */
-    void handlePollForAllGuilds(@NonNull List<Guild> guilds);
+    void handlePollsForGuilds(@NonNull List<Guild> guilds);
 
     void addVote(long userId, long answerId, long messageId);
 
