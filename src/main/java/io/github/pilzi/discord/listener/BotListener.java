@@ -55,7 +55,7 @@ public class BotListener extends ListenerAdapter {
 
     @Override
     public void onReady(@NonNull ReadyEvent event) {
-        // Schedul regular event to fill the database with premier event data
+        // Schedule regular event to fill the database with premier event data
         scheduler.scheduleAtFixedRate(importService::importPremierData, SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.HOURS);
 
         // Check if there is an active poll for the next event week
