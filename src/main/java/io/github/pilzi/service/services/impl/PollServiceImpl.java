@@ -2,6 +2,7 @@ package io.github.pilzi.service.services.impl;
 
 import io.github.pilzi.database.domain.*;
 import io.github.pilzi.database.enums.PollType;
+import io.github.pilzi.database.utils.AgentVoteUtil;
 import io.github.pilzi.database.utils.TransactionalUtil;
 import io.github.pilzi.database.workers.*;
 import io.github.pilzi.discord.enums.Agent;
@@ -155,44 +156,30 @@ public class PollServiceImpl implements PollService {
         }
     }
 
-    private static void sendAgentPoll(@NonNull GuildChannel guildChannel,
-                                      @NonNull List<EventEntity> eventsInCurrentWeek,
-                                      @NonNull ActivePollEntity newCreatedActivePollEntity) {
-        String channelId = guildChannel.getId();
-        TextChannel textChannel = guildChannel.getGuild().getTextChannelById(channelId);
-        if (textChannel != null) {
-            String text = "## ⚔\uFE0F Agent Selection\n" +
-                    "Which agents would you like to play on " +
-                    "**" + getMap(eventsInCurrentWeek) + "**?\n" +
-                    "\u200B";
-            List<ActionRow> actionRows = new ArrayList<>(DropdownUtil.buildAgendActionRows());
-
-            Message sentMessage = textChannel.sendMessage(text)
-                    .addComponents(actionRows)
-                    .complete();
-
-            newCreatedActivePollEntity.setMessageId(sentMessage.getIdLong());
-        }
-    }
-
     @Override
     public void replyToSelectAgentsButtonEventWithAgentPoll(@NonNull ButtonInteractionEvent event) {
-        List<EventEntity> eventsInCurrentWeek = new ArrayList<>();
-
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
-            eventsInCurrentWeek.addAll(eventWorker.collectEventsForCurrentWeek(session));
-        });
+            List<EventEntity> eventsInCurrentWeek = eventWorker.collectEventsForCurrentWeek(session);
             String text = "## ⚔\uFE0F Agent Selection\n" +
                     "Which agents would you like to play on " +
                     "**" + getMap(eventsInCurrentWeek) + "**?\n" +
                     "\u200B";
-            List<ActionRow> actionRows = new ArrayList<>(DropdownUtil.buildAgendActionRows());
+
+            ActivePollEntity scheduledActivePoll = activePollWorker.getScheduledActivePoll(session, Objects.requireNonNull(event.getGuild()).getIdLong());
+            List<AgentVoteEntity> agentVotes = agentVoteWorker.getAllVotes(session,
+                    Objects.requireNonNull(scheduledActivePoll.getId()));
+
+            Map<Role, List<String>> userForAgents = AgentVoteUtil.collectAgentsForRole(agentVotes);
+
+            List<ActionRow> actionRows = new ArrayList<>(DropdownUtil.buildAgendActionRows(userForAgents));
 
             event.reply(text)
                     .addComponents(actionRows)
                     .setEphemeral(true)
                     .complete();
+        });
     }
+
 
     private static @NonNull String getMap(@NonNull List<EventEntity> eventsInCurrentWeek) {
         return eventsInCurrentWeek.getFirst().getMap();
@@ -234,9 +221,9 @@ public class PollServiceImpl implements PollService {
             Role agentRole = Agent.getRoleByName(selectedAgents.getFirst());
             // Delete all existing agents with this specific role
             agentVoteWorker.deleteVoteByRole(session, agentRole, discordUserId);
-            ActivePollEntity agentActivePoll = Objects.requireNonNull(activePollWorker.getAgentActivePoll(session, guildId));
+            ActivePollEntity scheduledActivePoll = Objects.requireNonNull(activePollWorker.getScheduledActivePoll(session, guildId));
 
-            selectedAgents.forEach(agent -> session.persist(new AgentVoteEntity(discordUserId, agent, agentRole, agentActivePoll)));
+            selectedAgents.forEach(agent -> session.persist(new AgentVoteEntity(discordUserId, agent, agentRole, scheduledActivePoll)));
         });
     }
 
@@ -245,17 +232,16 @@ public class PollServiceImpl implements PollService {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
 
             guilds.forEach(guild -> {
-                ActivePollEntity agentActivePoll = activePollWorker.getAgentActivePoll(session, guild.getIdLong());
+                ActivePollEntity scheduledActivePoll = activePollWorker.getScheduledActivePoll(session, guild.getIdLong());
                 Optional<TextChannel> textChannelOptional = GuildUtil.findChannelInGuild(guild);
 
                 if (textChannelOptional.isPresent()) {
-                    List<AgentVoteEntity> agentVotes = agentVoteWorker.getAllVotes(session, Objects.requireNonNull(agentActivePoll.getId()));
-                    Map<Long, List<String>> userForAgents = collectAgentsForUser(agentVotes);
+                    List<AgentVoteEntity> agentVotes = agentVoteWorker.getAllVotes(session, Objects.requireNonNull(scheduledActivePoll.getId()));
+                    Map<Long, List<String>> userForAgents = AgentVoteUtil.collectAgentsForUser(agentVotes);
 
                     List<Long> userIdsToFetch = new ArrayList<>(userForAgents.keySet());
 
-                    textChannelOptional.get().retrieveMessageById(agentActivePoll.getMessageId()).queue(message -> {
-
+                    textChannelOptional.get().retrieveMessageById(scheduledActivePoll.getMessageId()).queue(message -> {
                         guild.retrieveMembersByIds(userIdsToFetch).onSuccess(members -> {
                             EmbedBuilder embedBuilder = new EmbedBuilder();
 
@@ -283,14 +269,5 @@ public class PollServiceImpl implements PollService {
 
     }
 
-    @NonNull
-    private Map<Long, List<String>> collectAgentsForUser(@NonNull List<AgentVoteEntity> agentVotes) {
-        Map<Long /* username */, List<String /* agent name */>> userForAgents = new HashMap<>();
 
-        agentVotes.forEach(agentVote -> {
-            userForAgents.computeIfAbsent(agentVote.getDiscordUserId(), a -> new ArrayList<>()).add(agentVote.getAgentName());
-        });
-
-        return userForAgents;
-    }
 }
