@@ -1,6 +1,7 @@
 package io.github.pilzi.service.services;
 
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
@@ -19,4 +20,6 @@ public interface PollService {
                               @NonNull List<String> selectedAgents);
 
     void updateAgentPollWithVotes(@NonNull List<Guild> guilds);
+
+    void replyToSelectAgentsButtonEventWithAgentPoll(@NonNull ButtonInteractionEvent event);
 }

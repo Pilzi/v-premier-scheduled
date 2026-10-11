@@ -21,6 +21,7 @@ import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
+import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import org.hibernate.Session;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -28,10 +29,10 @@ import org.jspecify.annotations.Nullable;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static io.github.pilzi.discord.listener.BotListener.AGENT_SUBMIT;
 
 public class PollServiceImpl implements PollService {
-
+    @NonNull
+    public static final String AGENT_SELECTION_BUTTON_ID = "agent-selection-button";
     @NonNull
     private final EventWorker eventWorker;
 
@@ -72,7 +73,6 @@ public class PollServiceImpl implements PollService {
     @Override
     public void handlePollsForGuilds(@NonNull List<Guild> guilds) {
         handleScheduledPollForAllGuilds(guilds);
-        handleAgentPollForAllGuilds(guilds);
     }
 
     private void handleScheduledPollForAllGuilds(@NonNull List<Guild> guilds) {
@@ -101,37 +101,6 @@ public class PollServiceImpl implements PollService {
 
                     if (textChannelOptional.isPresent()) {
                         sendScheduledPoll(textChannelOptional.get(), eventsInCurrentWeek, newCreatedActivePollEntity);
-                    }
-                }
-            });
-        });
-    }
-
-    private void handleAgentPollForAllGuilds(@NonNull List<Guild> guilds) {
-        TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
-            List<EventEntity> eventsInCurrentWeek = eventWorker.collectEventsForCurrentWeek(session);
-
-            guilds.forEach(guild -> {
-                GuildEntity guildEntity = guildWorker.getOrCreate(session, guild);
-                ActivePollEntity activeAgentPollEntity = activePollWorker.getAgentActivePoll(session, guild.getIdLong());
-
-                if (isActivePollExpired(activeAgentPollEntity)) {
-                    session.remove(activeAgentPollEntity);
-                    activeAgentPollEntity = null;
-                }
-
-                if (doesActivePollNotExist(activeAgentPollEntity)) {
-                    ActivePollEntity newCreatedActivePollEntity = new ActivePollEntity(CalendarUtil.getFirstInstantOfCurrentWeek(),
-                            CalendarUtil.getLastInstantOfCurrentWeek(),
-                            PollType.AGENT,
-                            guildEntity);
-                    session.persist(newCreatedActivePollEntity);
-
-
-                    Optional<TextChannel> textChannelOptional = GuildUtil.findChannelInGuild(guild);
-
-                    if (textChannelOptional.isPresent()) {
-                        sendAgentPoll(textChannelOptional.get(), eventsInCurrentWeek, newCreatedActivePollEntity);
                     }
                 }
             });
@@ -179,6 +148,7 @@ public class PollServiceImpl implements PollService {
         if (textChannel != null) {
             Message sentMessage = textChannel.sendMessage("")
                     .setPoll(PollUtil.buildEventPoll(getMap(eventsInCurrentWeek), eventsInCurrentWeek))
+                    .addComponents(ActionRow.of(Button.primary(AGENT_SELECTION_BUTTON_ID, "Select Agents")))
                     .complete();
 
             newCreatedActivePollEntity.setMessageId(sentMessage.getIdLong());
@@ -196,7 +166,6 @@ public class PollServiceImpl implements PollService {
                     "**" + getMap(eventsInCurrentWeek) + "**?\n" +
                     "\u200B";
             List<ActionRow> actionRows = new ArrayList<>(DropdownUtil.buildAgendActionRows());
-            addAgentPollSubmitButton(actionRows);
 
             Message sentMessage = textChannel.sendMessage(text)
                     .addComponents(actionRows)
@@ -206,10 +175,23 @@ public class PollServiceImpl implements PollService {
         }
     }
 
-    private static void addAgentPollSubmitButton(@NonNull List<ActionRow> actionRows) {
-        Button submitButton = Button.success(AGENT_SUBMIT, "submit");
-        ActionRow actionRow = ActionRow.of(submitButton);
-        actionRows.add(actionRow);
+    @Override
+    public void replyToSelectAgentsButtonEventWithAgentPoll(@NonNull ButtonInteractionEvent event) {
+        List<EventEntity> eventsInCurrentWeek = new ArrayList<>();
+
+        TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
+            eventsInCurrentWeek.addAll(eventWorker.collectEventsForCurrentWeek(session));
+        });
+            String text = "## ⚔\uFE0F Agent Selection\n" +
+                    "Which agents would you like to play on " +
+                    "**" + getMap(eventsInCurrentWeek) + "**?\n" +
+                    "\u200B";
+            List<ActionRow> actionRows = new ArrayList<>(DropdownUtil.buildAgendActionRows());
+
+            event.reply(text)
+                    .addComponents(actionRows)
+                    .setEphemeral(true)
+                    .complete();
     }
 
     private static @NonNull String getMap(@NonNull List<EventEntity> eventsInCurrentWeek) {
