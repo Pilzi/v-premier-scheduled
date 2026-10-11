@@ -10,6 +10,8 @@ import io.github.pilzi.discord.utils.Message.PollUtil;
 import io.github.pilzi.service.services.HibernateSessionFactoryService;
 import io.github.pilzi.service.services.PollService;
 import io.github.pilzi.service.utils.CalendarUtil;
+import net.dv8tion.jda.api.components.actionrow.ActionRow;
+import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
@@ -18,10 +20,13 @@ import org.hibernate.Session;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static io.github.pilzi.discord.listener.BotListener.AGENT_SUBMIT;
 
 public class PollServiceImpl implements PollService {
 
@@ -183,13 +188,21 @@ public class PollServiceImpl implements PollService {
                     "Which agents would you like to play on " +
                     "**" + getMap(eventsInCurrentWeek) + "**?\n" +
                     "\u200B";
+            List<ActionRow> actionRows = new ArrayList<>(DropdownUtil.buildAgendActionRows());
+            addAgentPollSubmitButton(actionRows);
 
             Message sentMessage = textChannel.sendMessage(text)
-                    .addComponents(DropdownUtil.buildAgendActionRows())
+                    .addComponents(actionRows)
                     .complete();
 
             newCreatedActivePollEntity.setMessageId(sentMessage.getIdLong());
         }
+    }
+
+    private static void addAgentPollSubmitButton(@NonNull List<ActionRow> actionRows) {
+        Button submitButton = Button.success(AGENT_SUBMIT, "submit");
+        ActionRow actionRow = ActionRow.of(submitButton);
+        actionRows.add(actionRow);
     }
 
     private static @NonNull String getMap(@NonNull List<EventEntity> eventsInCurrentWeek) {

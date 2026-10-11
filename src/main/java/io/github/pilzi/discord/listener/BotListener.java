@@ -27,7 +27,7 @@ import static io.github.pilzi.service.services.impl.ImportServiceImpl.VALORANT_R
 
 public class BotListener extends ListenerAdapter {
     @NonNull
-    public static final String AGENDA_SUBMIT = "agenda-submit";
+    public static final String AGENT_SUBMIT = "agent-submit";
     public static final int SCHEDULE_PERIOD_IN_HOURS = 2;
     public static final int SCHEDULE_INITIAL_DELAY_IN_HOURS = 0;
     @NonNull
@@ -64,7 +64,7 @@ public class BotListener extends ListenerAdapter {
 
     @Override
     public void onButtonInteraction(@NonNull ButtonInteractionEvent event) {
-        if (event.getComponentId().equals(AGENDA_SUBMIT)) {
+        if (event.getComponentId().equals(AGENT_SUBMIT)) {
             event.reply("Selection has been saved").setEphemeral(true).queue(); // send a message in the channel
         }
     }
