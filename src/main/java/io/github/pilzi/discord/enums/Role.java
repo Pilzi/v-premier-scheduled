@@ -3,10 +3,10 @@ package io.github.pilzi.discord.enums;
 import org.jspecify.annotations.NonNull;
 
 public enum Role {
-    DUELIST("Duelist"),
-    INITIATOR("Initiator"),
-    CONTROLLER("Controller"),
-    SENTINEL("Sentinel");
+    DUELIST("DUELIST"),
+    INITIATOR("INITIATOR"),
+    CONTROLLER("CONTROLLER"),
+    SENTINEL("SENTINEL");
 
     @NonNull
     private final String displayName;

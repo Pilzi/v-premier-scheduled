@@ -33,7 +33,7 @@ CREATE TABLE active_poll
     start_at   TIMESTAMP(6) NOT NULL,
     message_id BIGINT UNIQUE,
     end_at     TIMESTAMP(6) NOT NULL,
-    poll_type       POLL_TYPE    NOT NULL,
+    poll_type  POLL_TYPE    NOT NULL,
     guild_id   BIGINT       NOT NULL
         CONSTRAINT guild_id_guild_fk
             REFERENCES guild ON DELETE CASCADE ON UPDATE CASCADE,
@@ -74,3 +74,37 @@ CREATE TABLE hibernate_sequences
     sequence_name VARCHAR(255) NOT NULL PRIMARY KEY,
     next_val      BIGINT
 );
+
+CREATE TYPE agent_role AS ENUM ('DUELIST','INITIATOR','CONTROLLER', 'SENTINEL');
+CREATE TABLE agent_vote
+(
+    id              BIGINT      NOT NULL PRIMARY KEY,
+    discord_user_id BIGINT      NOT NULL,
+    agent_name      VARCHAR(20) NOT NULL,
+    agent_role      AGENT_ROLE  NOT NULL,
+    active_poll_id  BIGINT      NOT NULL
+        CONSTRAINT active_poll_id_active_poll_fk
+            REFERENCES active_poll ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE OR REPLACE FUNCTION verify_agent_poll_type()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+    IF NOT EXISTS (SELECT 1
+                   FROM active_poll
+                   WHERE id = NEW.active_poll_id
+                     AND poll_type = 'AGENT') THEN
+        RAISE EXCEPTION 'Foreign key violation: The referenced poll (ID %) is not an AGENT poll.', NEW.active_poll_id;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER enforce_agent_vote_poll_type
+    BEFORE INSERT OR UPDATE
+    ON agent_vote
+    FOR EACH ROW
+EXECUTE FUNCTION verify_agent_poll_type();
+
+
