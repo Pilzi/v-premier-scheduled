@@ -23,6 +23,7 @@ public class TransactionalUtil {
             session.flush();
             transaction.commit();
         } catch (Exception e) {
+            System.out.println(e);
             if (transaction != null) {
                 transaction.rollback();
             }

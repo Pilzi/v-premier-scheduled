@@ -66,6 +66,9 @@ public class BotListener extends ListenerAdapter {
 
         // Check if there is an active poll for the next event week
         scheduler.scheduleAtFixedRate(() -> pollService.handlePollsForGuilds(event.getJDA().getGuilds()), SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.HOURS);
+
+        // Add votes of other users to agent poll message
+        scheduler.scheduleAtFixedRate(() -> pollService.updateAgentPollWithVotes(event.getJDA().getGuilds()), SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.HOURS);
     }
 
     @Override

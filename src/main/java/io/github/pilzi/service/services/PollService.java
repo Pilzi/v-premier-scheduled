@@ -17,4 +17,6 @@ public interface PollService {
                               @NonNull Long messageId,
                               @NonNull Long discordUserId,
                               @NonNull List<String> selectedAgents);
+
+    void updateAgentPollWithVotes(@NonNull List<Guild> guilds);
 }

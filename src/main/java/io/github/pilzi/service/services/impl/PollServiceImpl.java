@@ -12,10 +12,13 @@ import io.github.pilzi.discord.utils.Message.PollUtil;
 import io.github.pilzi.service.services.HibernateSessionFactoryService;
 import io.github.pilzi.service.services.PollService;
 import io.github.pilzi.service.utils.CalendarUtil;
+import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import org.hibernate.Session;
@@ -94,10 +97,10 @@ public class PollServiceImpl implements PollService {
 
                     eventsInCurrentWeekToPollEventReferences(eventsInCurrentWeek, newCreatedActivePollEntity, session);
 
-                    Optional<GuildChannel> guildChannelOptional = GuildUtil.findChannelInGuild(guild);
+                    Optional<TextChannel> textChannelOptional = GuildUtil.findChannelInGuild(guild);
 
-                    if (guildChannelOptional.isPresent()) {
-                        sendScheduledPoll(guildChannelOptional.get(), eventsInCurrentWeek, newCreatedActivePollEntity);
+                    if (textChannelOptional.isPresent()) {
+                        sendScheduledPoll(textChannelOptional.get(), eventsInCurrentWeek, newCreatedActivePollEntity);
                     }
                 }
             });
@@ -125,10 +128,10 @@ public class PollServiceImpl implements PollService {
                     session.persist(newCreatedActivePollEntity);
 
 
-                    Optional<GuildChannel> guildChannelOptional = GuildUtil.findChannelInGuild(guild);
+                    Optional<TextChannel> textChannelOptional = GuildUtil.findChannelInGuild(guild);
 
-                    if (guildChannelOptional.isPresent()) {
-                        sendAgentPoll(guildChannelOptional.get(), eventsInCurrentWeek, newCreatedActivePollEntity);
+                    if (textChannelOptional.isPresent()) {
+                        sendAgentPoll(textChannelOptional.get(), eventsInCurrentWeek, newCreatedActivePollEntity);
                     }
                 }
             });
@@ -253,5 +256,59 @@ public class PollServiceImpl implements PollService {
 
             selectedAgents.forEach(agent -> session.persist(new AgentVoteEntity(discordUserId, agent, agentRole, agentActivePoll)));
         });
+    }
+
+    @Override
+    public void updateAgentPollWithVotes(@NonNull List<Guild> guilds) {
+        TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
+
+            guilds.forEach(guild -> {
+                ActivePollEntity agentActivePoll = activePollWorker.getAgentActivePoll(session, guild.getIdLong());
+                Optional<TextChannel> textChannelOptional = GuildUtil.findChannelInGuild(guild);
+
+                if (textChannelOptional.isPresent()) {
+                    List<AgentVoteEntity> agentVotes = agentVoteWorker.getAllVotes(session, Objects.requireNonNull(agentActivePoll.getId()));
+                    Map<Long, List<String>> userForAgents = collectAgentsForUser(agentVotes);
+
+                    List<Long> userIdsToFetch = new ArrayList<>(userForAgents.keySet());
+
+                    textChannelOptional.get().retrieveMessageById(agentActivePoll.getMessageId()).queue(message -> {
+
+                        guild.retrieveMembersByIds(userIdsToFetch).onSuccess(members -> {
+                            EmbedBuilder embedBuilder = new EmbedBuilder();
+
+                            Map<Long, String> memberNames = new HashMap<>();
+                            for (Member m : members) {
+                                memberNames.put(m.getIdLong(), m.getEffectiveName());
+                            }
+
+                            userForAgents.forEach((discordUserId, agents) -> {
+                                String name = memberNames.getOrDefault(discordUserId, "Unknown user");
+
+                                embedBuilder.addField(new MessageEmbed.Field(
+                                        name,
+                                        String.join(", ", agents),
+                                        true));
+                            });
+
+                            message.editMessageEmbeds(embedBuilder.build()).complete();
+                        });
+                    });
+                }
+
+            });
+        });
+
+    }
+
+    @NonNull
+    private Map<Long, List<String>> collectAgentsForUser(@NonNull List<AgentVoteEntity> agentVotes) {
+        Map<Long /* username */, List<String /* agent name */>> userForAgents = new HashMap<>();
+
+        agentVotes.forEach(agentVote -> {
+            userForAgents.computeIfAbsent(agentVote.getDiscordUserId(), a -> new ArrayList<>()).add(agentVote.getAgentName());
+        });
+
+        return userForAgents;
     }
 }
