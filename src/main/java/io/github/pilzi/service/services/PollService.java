@@ -9,7 +9,12 @@ public interface PollService {
 
     void handlePollsForGuilds(@NonNull List<Guild> guilds);
 
-    void addVote(long userId, long answerId, long messageId);
+    void addScheduleVote(long userId, long answerId, long messageId);
 
-    void removeVote(long userId, long answerId, long messageId);
+    void removeScheduleVote(long userId, long answerId, long messageId);
+
+    void importSelectedAgents(@NonNull Long guildId,
+                              @NonNull Long messageId,
+                              @NonNull Long discordUserId,
+                              @NonNull List<String> selectedAgents);
 }

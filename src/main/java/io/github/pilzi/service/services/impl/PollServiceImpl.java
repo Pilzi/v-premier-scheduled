@@ -4,6 +4,8 @@ import io.github.pilzi.database.domain.*;
 import io.github.pilzi.database.enums.PollType;
 import io.github.pilzi.database.utils.TransactionalUtil;
 import io.github.pilzi.database.workers.*;
+import io.github.pilzi.discord.enums.Agent;
+import io.github.pilzi.discord.enums.Role;
 import io.github.pilzi.discord.utils.GuildUtil;
 import io.github.pilzi.discord.utils.Message.DropdownUtil;
 import io.github.pilzi.discord.utils.Message.PollUtil;
@@ -20,10 +22,7 @@ import org.hibernate.Session;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.github.pilzi.discord.listener.BotListener.AGENT_SUBMIT;
@@ -48,18 +47,23 @@ public class PollServiceImpl implements PollService {
     @NonNull
     private final ActivePollVoteWorker activePollVoteWorker;
 
+    @NonNull
+    private final AgentVoteWorker agentVoteWorker;
+
     public PollServiceImpl(@NonNull EventWorker eventWorker,
                            @NonNull GuildWorker guildWorker,
                            @NonNull ActivePollWorker activePollWorker,
                            @NonNull ActivePollEventReferenceWorker activePollEventReferenceWorker,
                            @NonNull HibernateSessionFactoryService hibernateSessionFactoryService,
-                           @NonNull ActivePollVoteWorker activePollVoteWorker) {
+                           @NonNull ActivePollVoteWorker activePollVoteWorker,
+                           @NonNull AgentVoteWorker agentVoteWorker) {
         this.eventWorker = eventWorker;
         this.guildWorker = guildWorker;
         this.activePollWorker = activePollWorker;
         this.activePollEventReferenceWorker = activePollEventReferenceWorker;
         this.hibernateSessionFactoryService = hibernateSessionFactoryService;
         this.activePollVoteWorker = activePollVoteWorker;
+        this.agentVoteWorker = agentVoteWorker;
     }
 
     @Override
@@ -210,9 +214,9 @@ public class PollServiceImpl implements PollService {
     }
 
     @Override
-    public void addVote(long userId,
-                        long answerId,
-                        long messageId) {
+    public void addScheduleVote(long userId,
+                                long answerId,
+                                long messageId) {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             ActivePollEventReferenceEntity activePollEventReferenceEntity = activePollEventReferenceWorker.findByMessageIdAndIndex(session, messageId, answerId);
 
@@ -223,15 +227,31 @@ public class PollServiceImpl implements PollService {
     }
 
     @Override
-    public void removeVote(long userId,
-                           long answerId,
-                           long messageId) {
+    public void removeScheduleVote(long userId,
+                                   long answerId,
+                                   long messageId) {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             ActivePollVoteEntity activePollVoteEntity = activePollVoteWorker.find(session, answerId, messageId, userId);
 
             if (activePollVoteEntity != null) {
                 session.remove(activePollVoteEntity);
             }
+        });
+    }
+
+    @Override
+    public void importSelectedAgents(@NonNull Long guildId,
+                                     @NonNull Long messageId,
+                                     @NonNull Long discordUserId,
+                                     @NonNull List<String> selectedAgents) {
+        TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
+            // The poll is grouped by roles each agent have the same role in this list
+            Role agentRole = Agent.getRoleByName(selectedAgents.getFirst());
+            // Delete all existing agents with this specific role
+            agentVoteWorker.deleteVoteByRole(session, agentRole, discordUserId);
+            ActivePollEntity agentActivePoll = Objects.requireNonNull(activePollWorker.getAgentActivePoll(session, guildId));
+
+            selectedAgents.forEach(agent -> session.persist(new AgentVoteEntity(discordUserId, agent, agentRole, agentActivePoll)));
         });
     }
 }

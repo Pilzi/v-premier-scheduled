@@ -23,5 +23,6 @@
         <mapping class="io.github.pilzi.database.domain.ActivePollEntity"/>
         <mapping class="io.github.pilzi.database.domain.ActivePollEventReferenceEntity"/>
         <mapping class="io.github.pilzi.database.domain.ActivePollVoteEntity"/>
+        <mapping class="io.github.pilzi.database.domain.AgentVoteEntity"/>
     </session-factory>
 </hibernate-configuration>

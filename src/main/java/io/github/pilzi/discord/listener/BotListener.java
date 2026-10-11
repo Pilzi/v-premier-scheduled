@@ -9,14 +9,18 @@ import io.github.pilzi.service.services.PollService;
 import io.github.pilzi.service.services.impl.HibernateSessionFactoryServiceImpl;
 import io.github.pilzi.service.services.impl.ImportServiceImpl;
 import io.github.pilzi.service.services.impl.PollServiceImpl;
+import net.dv8tion.jda.api.components.selections.SelectOption;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.GenericSelectMenuInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.events.message.poll.MessagePollVoteAddEvent;
 import net.dv8tion.jda.api.events.message.poll.MessagePollVoteRemoveEvent;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.jspecify.annotations.NonNull;
 
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -39,6 +43,8 @@ public class BotListener extends ListenerAdapter {
     @NonNull
     private final ActivePollWorker activePollWorker = new ActivePollWorker();
     @NonNull
+    private final AgentVoteWorker agentVoteWorker = new AgentVoteWorker();
+    @NonNull
     private final HibernateSessionFactoryService hibernateSessionFactoryService = new HibernateSessionFactoryServiceImpl();
     @NonNull
     private final RestService restService = new RestServiceImpl(DOTENV.get(HENRIKDEV_API_KEY_ENV), DOTENV.get(VALORANT_REGION_ENV));
@@ -51,7 +57,7 @@ public class BotListener extends ListenerAdapter {
     @NonNull
     private final ActivePollVoteWorker activePollVoteWorker = new ActivePollVoteWorker();
     @NonNull
-    private final PollService pollService = new PollServiceImpl(eventWorker, guildWorker, activePollWorker, activePollEventReferenceWorker, hibernateSessionFactoryService, activePollVoteWorker);
+    private final PollService pollService = new PollServiceImpl(eventWorker, guildWorker, activePollWorker, activePollEventReferenceWorker, hibernateSessionFactoryService, activePollVoteWorker, agentVoteWorker);
 
     @Override
     public void onReady(@NonNull ReadyEvent event) {
@@ -70,13 +76,26 @@ public class BotListener extends ListenerAdapter {
     }
 
     @Override
+    public void onStringSelectInteraction(@NonNull StringSelectInteractionEvent event) {
+        List<String> selectedAgents = event.getInteraction().getSelectedOptions().stream()
+                .map(SelectOption::getValue)
+                .toList();
+
+        pollService.importSelectedAgents(
+                Objects.requireNonNull(event.getGuild()).getIdLong(),
+                event.getMessageIdLong(),
+                event.getInteraction().getUser().getIdLong(),
+                selectedAgents);
+    }
+
+    @Override
     public void onMessagePollVoteAdd(@NonNull MessagePollVoteAddEvent event) {
-        pollService.addVote(event.getUserIdLong(), event.getAnswerId(), event.getMessageIdLong());
+        pollService.addScheduleVote(event.getUserIdLong(), event.getAnswerId(), event.getMessageIdLong());
     }
 
     @Override
     public void onMessagePollVoteRemove(@NonNull MessagePollVoteRemoveEvent event) {
-        pollService.removeVote(event.getUserIdLong(), event.getAnswerId(), event.getMessageIdLong());
+        pollService.removeScheduleVote(event.getUserIdLong(), event.getAnswerId(), event.getMessageIdLong());
     }
 
     @Override

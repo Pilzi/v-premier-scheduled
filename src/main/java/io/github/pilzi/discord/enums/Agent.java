@@ -38,9 +38,20 @@ public enum Agent {
     @NonNull
     private final Role role;
 
-    Agent(@NonNull String displayName,@NonNull Role role) {
+    Agent(@NonNull String displayName, @NonNull Role role) {
         this.displayName = displayName;
         this.role = role;
+    }
+
+    @NonNull
+    public static Role getRoleByName(@NonNull String agentName) {
+        String agentNameLowerCase = agentName.toLowerCase();
+        for (Agent agent : Agent.values()) {
+            if (agent.displayName.toLowerCase().equals(agentNameLowerCase)) {
+                return agent.getRole();
+            }
+        }
+        throw new RuntimeException(String.format("Unable to return role because the agent named %s does not exist", agentName));
     }
 
     @NonNull
