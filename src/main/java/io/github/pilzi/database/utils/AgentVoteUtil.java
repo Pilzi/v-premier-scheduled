@@ -23,9 +23,7 @@ public class AgentVoteUtil {
     public static Map<Long, List<String>> collectAgentsForUser(@NonNull List<AgentVoteEntity> agentVotes) {
         Map<Long /* username */, List<String /* agent name */>> userForAgents = new HashMap<>();
 
-        agentVotes.forEach(agentVote -> {
-            userForAgents.computeIfAbsent(agentVote.getDiscordUserId(), a -> new ArrayList<>()).add(agentVote.getAgentName());
-        });
+        agentVotes.forEach(agentVote -> userForAgents.computeIfAbsent(agentVote.getDiscordUserId(), a -> new ArrayList<>()).add(agentVote.getAgentName()));
 
         return userForAgents;
     }

@@ -160,7 +160,7 @@ public class PollServiceImpl implements PollService {
     public void replyToSelectAgentsButtonEventWithAgentPoll(@NonNull ButtonInteractionEvent event) {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             List<EventEntity> eventsInCurrentWeek = eventWorker.collectEventsForCurrentWeek(session);
-            String text = "## ⚔\uFE0F Agent Selection\n" +
+            String text = "## ⚔️ Agent Selection\n" +
                     "Which agents would you like to play on " +
                     "**" + getMap(eventsInCurrentWeek) + "**?\n" +
                     "\u200B";
