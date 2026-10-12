@@ -1,6 +1,7 @@
 package io.github.pilzi.database.utils;
 
 import io.github.pilzi.database.domain.AgentVoteEntity;
+import io.github.pilzi.discord.enums.Agent;
 import io.github.pilzi.discord.enums.Role;
 import org.jspecify.annotations.NonNull;
 
@@ -23,7 +24,8 @@ public class AgentVoteUtil {
     public static Map<Long, List<String>> collectAgentsForUser(@NonNull List<AgentVoteEntity> agentVotes) {
         Map<Long /* username */, List<String /* agent name */>> userForAgents = new HashMap<>();
 
-        agentVotes.forEach(agentVote -> userForAgents.computeIfAbsent(agentVote.getDiscordUserId(), a -> new ArrayList<>()).add(agentVote.getAgentName()));
+        agentVotes.forEach(agentVote -> userForAgents.computeIfAbsent(agentVote.getDiscordUserId(), _ ->
+                new ArrayList<>()).add(Agent.getEmojiByNameOrDisplayNameFallback(agentVote.getAgentName())));
 
         return userForAgents;
     }
