@@ -1,5 +1,6 @@
 package io.github.pilzi.service.services;
 
+import io.github.pilzi.discord.enums.Role;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import org.jspecify.annotations.NonNull;
@@ -17,7 +18,8 @@ public interface PollService {
     void importSelectedAgents(@NonNull Long guildId,
                               @NonNull Long messageId,
                               @NonNull Long discordUserId,
-                              @NonNull List<String> selectedAgents);
+                              @NonNull List<String> selectedAgents,
+                              @NonNull Role role);
 
     void updateAgentPollWithVotes(@NonNull List<Guild> guilds);
 

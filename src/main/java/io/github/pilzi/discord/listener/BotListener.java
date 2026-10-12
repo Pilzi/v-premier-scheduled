@@ -1,6 +1,7 @@
 package io.github.pilzi.discord.listener;
 
 import io.github.pilzi.database.workers.*;
+import io.github.pilzi.discord.enums.Role;
 import io.github.pilzi.henrikdev.service.RestService;
 import io.github.pilzi.henrikdev.service.impl.RestServiceImpl;
 import io.github.pilzi.service.services.HibernateSessionFactoryService;
@@ -87,7 +88,8 @@ public class BotListener extends ListenerAdapter {
                 Objects.requireNonNull(event.getGuild()).getIdLong(),
                 event.getMessageIdLong(),
                 event.getInteraction().getUser().getIdLong(),
-                selectedAgents);
+                selectedAgents,
+                Role.getRoleByCustomComponentId(event.getCustomId()));
     }
 
     @Override

@@ -224,15 +224,14 @@ public class PollServiceImpl implements PollService {
     public void importSelectedAgents(@NonNull Long guildId,
                                      @NonNull Long messageId,
                                      @NonNull Long discordUserId,
-                                     @NonNull List<String> selectedAgents) {
+                                     @NonNull List<String> selectedAgents,
+                                     @NonNull Role role) {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
-            // The poll is grouped by roles each agent have the same role in this list
-            Role agentRole = Agent.getRoleByName(selectedAgents.getFirst());
             // Delete all existing agents with this specific role
-            agentVoteWorker.deleteVoteByRole(session, agentRole, discordUserId);
+            agentVoteWorker.deleteVoteByRole(session, role, discordUserId);
             ActivePollEntity scheduledActivePoll = Objects.requireNonNull(activePollWorker.getScheduledActivePoll(session, guildId));
 
-            selectedAgents.forEach(agent -> session.persist(new AgentVoteEntity(discordUserId, agent, agentRole, scheduledActivePoll)));
+            selectedAgents.forEach(agent -> session.persist(new AgentVoteEntity(discordUserId, agent, role, scheduledActivePoll)));
         });
     }
 
