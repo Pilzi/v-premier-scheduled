@@ -5,7 +5,6 @@ import io.github.pilzi.database.enums.PollType;
 import io.github.pilzi.database.utils.AgentVoteUtil;
 import io.github.pilzi.database.utils.TransactionalUtil;
 import io.github.pilzi.database.workers.*;
-import io.github.pilzi.discord.enums.Agent;
 import io.github.pilzi.discord.enums.Role;
 import io.github.pilzi.discord.utils.GuildUtil;
 import io.github.pilzi.discord.utils.Message.DropdownUtil;
@@ -63,13 +62,7 @@ public class PollServiceImpl implements PollService {
     @NonNull
     private final AgentVoteWorker agentVoteWorker;
 
-    public PollServiceImpl(@NonNull EventWorker eventWorker,
-                           @NonNull GuildWorker guildWorker,
-                           @NonNull ActivePollWorker activePollWorker,
-                           @NonNull ActivePollEventReferenceWorker activePollEventReferenceWorker,
-                           @NonNull HibernateSessionFactoryService hibernateSessionFactoryService,
-                           @NonNull ActivePollVoteWorker activePollVoteWorker,
-                           @NonNull AgentVoteWorker agentVoteWorker) {
+    public PollServiceImpl(@NonNull EventWorker eventWorker, @NonNull GuildWorker guildWorker, @NonNull ActivePollWorker activePollWorker, @NonNull ActivePollEventReferenceWorker activePollEventReferenceWorker, @NonNull HibernateSessionFactoryService hibernateSessionFactoryService, @NonNull ActivePollVoteWorker activePollVoteWorker, @NonNull AgentVoteWorker agentVoteWorker) {
         this.eventWorker = eventWorker;
         this.guildWorker = guildWorker;
         this.activePollWorker = activePollWorker;
@@ -99,10 +92,7 @@ public class PollServiceImpl implements PollService {
                 }
 
                 if (doesActivePollNotExist(activePollEntity)) {
-                    ActivePollEntity newCreatedActivePollEntity = new ActivePollEntity(CalendarUtil.getFirstInstantOfCurrentWeek(),
-                            CalendarUtil.getLastInstantOfCurrentWeek(),
-                            PollType.SCHEDULE,
-                            guildEntity);
+                    ActivePollEntity newCreatedActivePollEntity = new ActivePollEntity(CalendarUtil.getFirstInstantOfCurrentWeek(), CalendarUtil.getLastInstantOfCurrentWeek(), PollType.SCHEDULE, guildEntity);
                     session.persist(newCreatedActivePollEntity);
 
                     eventsInCurrentWeekToPollEventReferences(eventsInCurrentWeek, newCreatedActivePollEntity, session);
@@ -126,19 +116,14 @@ public class PollServiceImpl implements PollService {
      * @param newCreatedActivePollEntity The poll object currently being created
      * @param session                    The active Hibernate session
      */
-    private static void eventsInCurrentWeekToPollEventReferences(@NonNull List<EventEntity> eventsInCurrentWeek,
-                                                                 @NonNull ActivePollEntity newCreatedActivePollEntity,
-                                                                 @NonNull Session session) {
+    private static void eventsInCurrentWeekToPollEventReferences(@NonNull List<EventEntity> eventsInCurrentWeek, @NonNull ActivePollEntity newCreatedActivePollEntity, @NonNull Session session) {
         AtomicInteger orderIndex = new AtomicInteger(1);
 
-        eventsInCurrentWeek.stream()
-                .sorted(Comparator.comparing(EventEntity::getStartAt))
-                .map((eventInCurrentWeek) -> {
-                    int orderIndexValue = orderIndex.get();
-                    orderIndex.set(orderIndexValue + 1);
-                    return new ActivePollEventReferenceEntity(newCreatedActivePollEntity, eventInCurrentWeek, orderIndexValue);
-                })
-                .forEach(session::persist);
+        eventsInCurrentWeek.stream().sorted(Comparator.comparing(EventEntity::getStartAt)).map((eventInCurrentWeek) -> {
+            int orderIndexValue = orderIndex.get();
+            orderIndex.set(orderIndexValue + 1);
+            return new ActivePollEventReferenceEntity(newCreatedActivePollEntity, eventInCurrentWeek, orderIndexValue);
+        }).forEach(session::persist);
     }
 
     private static boolean doesActivePollNotExist(@Nullable ActivePollEntity activePollEntity) {
@@ -150,16 +135,11 @@ public class PollServiceImpl implements PollService {
     }
 
 
-    private static void sendScheduledPoll(@NonNull GuildChannel guildChannel,
-                                          @NonNull List<EventEntity> eventsInCurrentWeek,
-                                          @NonNull ActivePollEntity newCreatedActivePollEntity) {
+    private static void sendScheduledPoll(@NonNull GuildChannel guildChannel, @NonNull List<EventEntity> eventsInCurrentWeek, @NonNull ActivePollEntity newCreatedActivePollEntity) {
         String channelId = guildChannel.getId();
         TextChannel textChannel = guildChannel.getGuild().getTextChannelById(channelId);
         if (textChannel != null) {
-            Message sentMessage = textChannel.sendMessage("")
-                    .setPoll(PollUtil.buildEventPoll(getMap(eventsInCurrentWeek), eventsInCurrentWeek))
-                    .addComponents(ActionRow.of(Button.primary(AGENT_SELECTION_BUTTON_ID, "Select Agents")))
-                    .complete();
+            Message sentMessage = textChannel.sendMessage("").setPoll(PollUtil.buildEventPoll(getMap(eventsInCurrentWeek), eventsInCurrentWeek)).addComponents(ActionRow.of(Button.primary(AGENT_SELECTION_BUTTON_ID, "Select Agents"))).complete();
 
             newCreatedActivePollEntity.setMessageId(sentMessage.getIdLong());
         }
@@ -169,23 +149,16 @@ public class PollServiceImpl implements PollService {
     public void replyToSelectAgentsButtonEventWithAgentPoll(@NonNull ButtonInteractionEvent event) {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             List<EventEntity> eventsInCurrentWeek = eventWorker.collectEventsForCurrentWeek(session);
-            String text = "## ⚔️ Agent Selection\n" +
-                    "Which agents would you like to play on " +
-                    "**" + getMap(eventsInCurrentWeek) + "**?\n" +
-                    LINE_BREAK_AT_THE_END_CODE;
+            String text = "## ⚔️ Agent Selection\n" + "Which agents would you like to play on " + "**" + getMap(eventsInCurrentWeek) + "**?\n" + LINE_BREAK_AT_THE_END_CODE;
 
             ActivePollEntity scheduledActivePoll = activePollWorker.getScheduledActivePoll(session, Objects.requireNonNull(event.getGuild()).getIdLong());
-            List<AgentVoteEntity> agentVotes = agentVoteWorker.getAllVotes(session,
-                    Objects.requireNonNull(scheduledActivePoll.getId()));
+            List<AgentVoteEntity> agentVotes = agentVoteWorker.getVotesForUser(session, Objects.requireNonNull(scheduledActivePoll.getId()), event.getUser().getIdLong());
 
             Map<Role, List<String>> userForAgents = AgentVoteUtil.collectAgentsForRole(agentVotes);
 
             List<ActionRow> actionRows = new ArrayList<>(DropdownUtil.buildAgendActionRows(userForAgents));
 
-            event.reply(text)
-                    .addComponents(actionRows)
-                    .setEphemeral(true)
-                    .complete();
+            event.reply(text).addComponents(actionRows).setEphemeral(true).complete();
         });
     }
 
@@ -195,9 +168,7 @@ public class PollServiceImpl implements PollService {
     }
 
     @Override
-    public void addScheduleVote(long userId,
-                                long answerId,
-                                long messageId) {
+    public void addScheduleVote(long userId, long answerId, long messageId) {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             ActivePollEventReferenceEntity activePollEventReferenceEntity = activePollEventReferenceWorker.findByMessageIdAndIndex(session, messageId, answerId);
 
@@ -208,9 +179,7 @@ public class PollServiceImpl implements PollService {
     }
 
     @Override
-    public void removeScheduleVote(long userId,
-                                   long answerId,
-                                   long messageId) {
+    public void removeScheduleVote(long userId, long answerId, long messageId) {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             ActivePollVoteEntity activePollVoteEntity = activePollVoteWorker.find(session, answerId, messageId, userId);
 
@@ -221,11 +190,7 @@ public class PollServiceImpl implements PollService {
     }
 
     @Override
-    public void importSelectedAgents(@NonNull Long guildId,
-                                     @NonNull Long messageId,
-                                     @NonNull Long discordUserId,
-                                     @NonNull List<String> selectedAgents,
-                                     @NonNull Role role) {
+    public void importSelectedAgents(@NonNull Long guildId, @NonNull Long messageId, @NonNull Long discordUserId, @NonNull List<String> selectedAgents, @NonNull Role role) {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             // Delete all existing agents with this specific role
             agentVoteWorker.deleteVoteByRole(session, role, discordUserId);
@@ -269,8 +234,9 @@ public class PollServiceImpl implements PollService {
 
                                 if (!agentsWithEmoji.isEmpty()) {
                                     description.append("\n").append("## ").append(String.join(" ", agentsWithEmoji));
-                                } if (!agentsWithName.isEmpty()) {
-                                       description.append("\n").append(String.join(", ", agentsWithName));
+                                }
+                                if (!agentsWithName.isEmpty()) {
+                                    description.append("\n").append(String.join(", ", agentsWithName));
                                 }
 
                                 description.append("\n");

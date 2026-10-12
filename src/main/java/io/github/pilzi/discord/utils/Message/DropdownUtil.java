@@ -10,13 +10,14 @@ import java.util.*;
 
 public class DropdownUtil {
     @NonNull
-    private static final String AGENT_SELECTION_CUSTOM_ID_PREFIX = "agent-selection-";
+    public static final String AGENT_SELECTION_CUSTOM_ID_PREFIX = "agent-selection-";
     @NonNull
     private static final String AGENT_SELECTION_PLACEHOLDER = "Choose your %s agents";
     public static final int MIN_VALUES = 0;
 
     /**
      * Build multiple rows to be able to select agents of any {@link Role}
+     *
      * @param defaultsForRole The menu is set user specific when the user clicks it again his selections should be loaded as defaults
      * @return list of {@link StringSelectMenu}
      */

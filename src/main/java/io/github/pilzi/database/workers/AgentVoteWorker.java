@@ -13,9 +13,9 @@ public class AgentVoteWorker {
                                  @NonNull Role agentRole,
                                  @NonNull Long discordUserId) {
         session.createQuery("DELETE" +
-                " FROM AgentVoteEntity vote" +
-                " WHERE vote.agentRole = :agentRole" +
-                " AND vote.discordUserId = :discordUserId")
+                        " FROM AgentVoteEntity vote" +
+                        " WHERE vote.agentRole = :agentRole" +
+                        " AND vote.discordUserId = :discordUserId")
                 .setParameter("agentRole", agentRole)
                 .setParameter("discordUserId", discordUserId)
                 .executeUpdate();
@@ -25,9 +25,22 @@ public class AgentVoteWorker {
     public List<AgentVoteEntity> getAllVotes(@NonNull Session session,
                                              @NonNull Long activePollId) {
         return session.createQuery("SELECT vote" +
-                " FROM AgentVoteEntity vote" +
-                " WHERE vote.activePoll.id = :activePollId", AgentVoteEntity.class)
+                        " FROM AgentVoteEntity vote" +
+                        " WHERE vote.activePoll.id = :activePollId", AgentVoteEntity.class)
                 .setParameter("activePollId", activePollId)
+                .list();
+    }
+
+    @NonNull
+    public List<AgentVoteEntity> getVotesForUser(@NonNull Session session,
+                                                 @NonNull Long activePollId,
+                                                 @NonNull Long discordUserId) {
+        return session.createQuery("SELECT vote" +
+                        " FROM AgentVoteEntity vote" +
+                        " WHERE vote.activePoll.id = :activePollId" +
+                        " AND vote.discordUserId = :discordUserId", AgentVoteEntity.class)
+                .setParameter("activePollId", activePollId)
+                .setParameter("discordUserId", discordUserId)
                 .list();
     }
 }
