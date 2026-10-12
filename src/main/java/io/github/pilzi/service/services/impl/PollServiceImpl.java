@@ -257,7 +257,7 @@ public class PollServiceImpl implements PollService {
                                 embedBuilder.addField(new MessageEmbed.Field(
                                         name,
                                         String.join(", ", agents),
-                                        true));
+                                        false));
                             });
 
                             message.editMessageEmbeds(embedBuilder.build()).complete();
