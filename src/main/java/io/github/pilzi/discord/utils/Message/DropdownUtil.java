@@ -2,6 +2,7 @@ package io.github.pilzi.discord.utils.Message;
 
 import io.github.pilzi.discord.enums.Agent;
 import io.github.pilzi.discord.enums.Role;
+import io.github.pilzi.discord.utils.LanguageUtil;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.selections.StringSelectMenu;
 import org.jspecify.annotations.NonNull;
@@ -11,8 +12,6 @@ import java.util.*;
 public class DropdownUtil {
     @NonNull
     public static final String AGENT_SELECTION_CUSTOM_ID_PREFIX = "agent-selection-";
-    @NonNull
-    private static final String AGENT_SELECTION_PLACEHOLDER = "Choose your %s agents";
     public static final int MIN_VALUES = 0;
 
     /**
@@ -33,7 +32,7 @@ public class DropdownUtil {
 
             StringSelectMenu.Builder menuBuilder = StringSelectMenu
                     .create(AGENT_SELECTION_CUSTOM_ID_PREFIX + role.name().toLowerCase())
-                    .setPlaceholder(String.format(AGENT_SELECTION_PLACEHOLDER, role.getDisplayName().toLowerCase()))
+                    .setPlaceholder(LanguageUtil.getAgentSelectionPlaceholder(role))
                     .setMinValues(MIN_VALUES)
                     .setDefaultValues(defaults)
                     .setMaxValues(agentsForRole.size());

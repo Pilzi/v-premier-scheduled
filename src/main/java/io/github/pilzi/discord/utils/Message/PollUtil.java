@@ -1,6 +1,7 @@
 package io.github.pilzi.discord.utils.Message;
 
 import io.github.pilzi.database.domain.EventEntity;
+import io.github.pilzi.discord.utils.LanguageUtil;
 import net.dv8tion.jda.api.utils.messages.MessagePollBuilder;
 import net.dv8tion.jda.api.utils.messages.MessagePollData;
 import org.jspecify.annotations.NonNull;
@@ -38,10 +39,10 @@ public class PollUtil {
                 .sorted(Comparator.comparing(EventEntity::getStartAt))
                 .forEach(event -> {
                     Instant startAt = event.getStartAt();
-                    String dayOfWeek = startAt.atZone(ZoneId.systemDefault()).getDayOfWeek().toString();
+                    String dayOfWeek = LanguageUtil.getDayOfWeek(startAt.atZone(ZoneId.systemDefault()).getDayOfWeek());
                     String text = (event.isPractice() ? PRACTICE_DAY_TEXT : MATCH_DAY_TEXT)
                             + DAY_TYPE_TIME_SEPARATOR
-                            + dayOfWeek.substring(0, 1).toUpperCase() + dayOfWeek.substring(1).toLowerCase()
+                            + dayOfWeek
                             + WEEKDAY_DATE_SEPARATOR
                             + dateFormatter.format(Date.from(startAt))
                             + HOUR_SEPARATOR
@@ -49,7 +50,7 @@ public class PollUtil {
                     pollBuilder.addAnswer(text.substring(0, Math.min(text.length(), 80)));
                 });
 
-        pollBuilder.addAnswer("Count me out");
+        pollBuilder.addAnswer(LanguageUtil.getCountMeOutMessage());
 
     return pollBuilder
             .setMultiAnswer(true)

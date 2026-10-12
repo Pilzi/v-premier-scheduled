@@ -7,6 +7,7 @@ import io.github.pilzi.database.utils.TransactionalUtil;
 import io.github.pilzi.database.workers.*;
 import io.github.pilzi.discord.enums.Role;
 import io.github.pilzi.discord.utils.GuildUtil;
+import io.github.pilzi.discord.utils.LanguageUtil;
 import io.github.pilzi.discord.utils.Message.DropdownUtil;
 import io.github.pilzi.discord.utils.Message.PollUtil;
 import io.github.pilzi.service.services.HibernateSessionFactoryService;
@@ -42,8 +43,6 @@ public class PollServiceImpl implements PollService {
     public static final String EMBED_RED = "#FF4655";
     @NonNull
     public static final String USER_NOT_FOUND_FALLBACK = "Unknown user";
-    public static final String AGENT_VOTE_NOT_POSSIBLE_ANYMORE = "Since the week is over, voting is no longer possible";
-    public static final String CLICK_HERE_TO_GO_TO_THE_CURRENT_POLL_TEXT = "Click here to go to the current poll ";
 
     @NonNull
     private final EventWorker eventWorker;
@@ -95,7 +94,7 @@ public class PollServiceImpl implements PollService {
                     session.flush();
                 }
 
-                if (doesActivePollNotExist(activePollEntity)) {
+                if (isActivePollOrMessageIdNull(activePollEntity)) {
                     ActivePollEntity newCreatedActivePollEntity = new ActivePollEntity(CalendarUtil.getFirstInstantOfCurrentWeek(), CalendarUtil.getLastInstantOfCurrentWeek(), PollType.SCHEDULE, guildEntity);
                     session.persist(newCreatedActivePollEntity);
 
@@ -130,10 +129,6 @@ public class PollServiceImpl implements PollService {
         }).forEach(session::persist);
     }
 
-    private static boolean doesActivePollNotExist(@Nullable ActivePollEntity activePollEntity) {
-        return isActivePollOrMessageIdNull(activePollEntity);
-    }
-
     private static boolean isActivePollExpired(@Nullable ActivePollEntity activePollEntity) {
         return activePollEntity != null && !CalendarUtil.doesMatchWeekBounds(activePollEntity.getStartAt(), activePollEntity.getEndAt());
     }
@@ -143,7 +138,10 @@ public class PollServiceImpl implements PollService {
         String channelId = guildChannel.getId();
         TextChannel textChannel = guildChannel.getGuild().getTextChannelById(channelId);
         if (textChannel != null) {
-            Message sentMessage = textChannel.sendMessage("").setPoll(PollUtil.buildEventPoll(getMap(eventsInCurrentWeek), eventsInCurrentWeek)).addComponents(ActionRow.of(Button.primary(AGENT_SELECTION_BUTTON_ID, "Select Agents"))).complete();
+            Message sentMessage = textChannel.sendMessage("")
+                    .setPoll(PollUtil.buildEventPoll(getMap(eventsInCurrentWeek), eventsInCurrentWeek))
+                    .addComponents(ActionRow.of(Button.primary(AGENT_SELECTION_BUTTON_ID, LanguageUtil.getSelectAgentsText())))
+                    .complete();
 
             newCreatedActivePollEntity.setMessageId(sentMessage.getIdLong());
         }
@@ -155,12 +153,13 @@ public class PollServiceImpl implements PollService {
             ActivePollEntity scheduledActivePoll = activePollWorker.getScheduledActivePoll(session, Objects.requireNonNull(event.getGuild()).getIdLong());
 
             if (isActivePollOrMessageIdNull(scheduledActivePoll)) {
-                replyToEventWithVoteNotPossible(event, AGENT_VOTE_NOT_POSSIBLE_ANYMORE);
+                replyToEventWithVoteNotPossible(event, LanguageUtil.getAgentVoteNotPossibleAnymore());
             } else if (scheduledActivePoll.getMessageId() != event.getMessageIdLong()) {
                 event.getChannel().retrieveMessageById(scheduledActivePoll.getMessageId()).queue(message -> {
                     String jumpUrl = message.getJumpUrl();
-                    replyToEventWithVoteNotPossible(event, AGENT_VOTE_NOT_POSSIBLE_ANYMORE + "\n" + CLICK_HERE_TO_GO_TO_THE_CURRENT_POLL_TEXT + jumpUrl);
-                }, _ -> replyToEventWithVoteNotPossible(event, AGENT_VOTE_NOT_POSSIBLE_ANYMORE));
+                    replyToEventWithVoteNotPossible(event,
+                            getVoteNotPossibleWithJumpUrl(jumpUrl));
+                }, _ -> replyToEventWithVoteNotPossible(event, LanguageUtil.getAgentVoteNotPossibleAnymore()));
 
             } else {
                 replyToEventWithAgentPoll(event, session, scheduledActivePoll);
@@ -168,11 +167,17 @@ public class PollServiceImpl implements PollService {
         });
     }
 
-    private void replyToEventWithAgentPoll(@NonNull ButtonInteractionEvent event, Session session, ActivePollEntity scheduledActivePoll) {
+    private static @NonNull String getVoteNotPossibleWithJumpUrl(@NonNull String jumpUrl) {
+        return LanguageUtil.getAgentVoteNotPossibleAnymore() + "\n" + LanguageUtil.getClickHereToGoToPollText() + " " + jumpUrl;
+    }
+
+    private void replyToEventWithAgentPoll(@NonNull ButtonInteractionEvent event,
+                                           @NonNull Session session,
+                                           @NonNull ActivePollEntity scheduledActivePoll) {
         List<EventEntity> eventsInCurrentWeek = eventWorker.collectEventsForCurrentWeek(session);
         List<AgentVoteEntity> agentVotes = agentVoteWorker.getVotesForUser(session, Objects.requireNonNull(scheduledActivePoll.getId()), event.getUser().getIdLong());
 
-        String text = "## ⚔️ Agent Selection\n" + "Which agents would you like to play on " + "**" + getMap(eventsInCurrentWeek) + "**?\n" + LINE_BREAK_AT_THE_END_CODE;
+        String text = LanguageUtil.getAgentSelectionText("**" + getMap(eventsInCurrentWeek) + "**") + "\n" + LINE_BREAK_AT_THE_END_CODE;
 
         Map<Role, List<String>> userForAgents = AgentVoteUtil.collectAgentsForRole(agentVotes);
 
@@ -183,8 +188,9 @@ public class PollServiceImpl implements PollService {
                 .queue();
     }
 
-    private static void replyToEventWithVoteNotPossible(@NonNull ButtonInteractionEvent event, String agentVoteNotPossibleAnymore) {
-        event.reply(agentVoteNotPossibleAnymore)
+    private static void replyToEventWithVoteNotPossible(@NonNull ButtonInteractionEvent event,
+                                                        @NonNull String voteNotPossibleMessage) {
+        event.reply(voteNotPossibleMessage)
                 .setEphemeral(true)
                 .queue();
     }
@@ -220,7 +226,11 @@ public class PollServiceImpl implements PollService {
     }
 
     @Override
-    public void importSelectedAgents(@NonNull Long guildId, @NonNull Long messageId, @NonNull Long discordUserId, @NonNull List<String> selectedAgents, @NonNull Role role) {
+    public void importSelectedAgents(@NonNull Long guildId,
+                                     @NonNull Long messageId,
+                                     @NonNull Long discordUserId,
+                                     @NonNull List<String> selectedAgents,
+                                     @NonNull Role role) {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             // Delete all existing agents with this specific role
             agentVoteWorker.deleteVoteByRole(session, role, discordUserId);
