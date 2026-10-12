@@ -40,6 +40,8 @@ public class PollServiceImpl implements PollService {
     public static final String LINE_BREAK_AT_THE_END_CODE = "\u200B";
     @NonNull
     public static final String EMBED_RED = "#FF4655";
+    @NonNull
+    public static final String USER_NOT_FOUND_FALLBACK = "Unknown user";
 
     @NonNull
     private final EventWorker eventWorker;
@@ -162,7 +164,6 @@ public class PollServiceImpl implements PollService {
         });
     }
 
-
     private static @NonNull String getMap(@NonNull List<EventEntity> eventsInCurrentWeek) {
         return eventsInCurrentWeek.getFirst().getMap();
     }
@@ -201,57 +202,62 @@ public class PollServiceImpl implements PollService {
     }
 
     @Override
-    public void updateAgentPollWithVotes(@NonNull List<Guild> guilds) {
+    public void updateAgentPollForSingleGuild(@NonNull Guild guild) {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
 
-            guilds.forEach(guild -> {
-                ActivePollEntity scheduledActivePoll = activePollWorker.getScheduledActivePoll(session, guild.getIdLong());
-                Optional<TextChannel> textChannelOptional = GuildUtil.findChannelInGuild(guild);
+            ActivePollEntity scheduledActivePoll = activePollWorker.getScheduledActivePoll(session, guild.getIdLong());
+            Optional<TextChannel> textChannelOptional = GuildUtil.findChannelInGuild(guild);
 
-                if (textChannelOptional.isPresent()) {
-                    List<AgentVoteEntity> agentVotes = agentVoteWorker.getAllVotes(session, Objects.requireNonNull(scheduledActivePoll.getId()));
-                    Map<Long, List<String>> userForAgents = AgentVoteUtil.collectAgentsForUser(agentVotes);
+            if (textChannelOptional.isPresent()) {
+                List<AgentVoteEntity> agentVotes = agentVoteWorker.getAllVotes(session, Objects.requireNonNull(scheduledActivePoll.getId()));
+                Map<Long, List<String>> userForAgents = AgentVoteUtil.collectAgentsForUser(agentVotes);
 
-                    List<Long> userIdsToFetch = new ArrayList<>(userForAgents.keySet());
+                List<Long> userIdsToFetch = new ArrayList<>(userForAgents.keySet());
 
-                    textChannelOptional.get().retrieveMessageById(scheduledActivePoll.getMessageId()).queue(message -> {
-                        guild.retrieveMembersByIds(userIdsToFetch).onSuccess(members -> {
-                            EmbedBuilder embedBuilder = new EmbedBuilder();
+                textChannelOptional.get().retrieveMessageById(scheduledActivePoll.getMessageId()).queue(message -> {
+                    guild.retrieveMembersByIds(userIdsToFetch).onSuccess(members -> {
+                        Map<Long, String> memberNames = getMemberIdForMemberMap(members);
 
-                            Map<Long, String> memberNames = new HashMap<>();
-                            for (Member m : members) {
-                                memberNames.put(m.getIdLong(), m.getEffectiveName());
-                            }
-
-                            StringBuilder description = new StringBuilder();
-
-                            userForAgents.forEach((discordUserId, agents) -> {
-                                String name = memberNames.getOrDefault(discordUserId, "Unknown user");
-                                List<String> agentsWithName = agents.stream().filter(agent -> !agent.startsWith(DISCORD_EMOJI_PREFIX)).toList();
-                                List<String> agentsWithEmoji = agents.stream().filter(agent -> agent.startsWith(DISCORD_EMOJI_PREFIX)).toList();
-
-                                description.append("## ").append(name);
-
-                                if (!agentsWithEmoji.isEmpty()) {
-                                    description.append("\n").append("## ").append(String.join(" ", agentsWithEmoji));
-                                }
-                                if (!agentsWithName.isEmpty()) {
-                                    description.append("\n").append(String.join(", ", agentsWithName));
-                                }
-
-                                description.append("\n");
-                            });
-
-                            embedBuilder.setDescription(description.toString());
-                            embedBuilder.setColor(Color.decode(EMBED_RED));
-                            message.editMessageEmbeds(embedBuilder.build()).complete();
-                        });
+                        EmbedBuilder embedBuilder = createUserAgentsDisplayEmbedBuilder(userForAgents, memberNames);
+                        message.editMessageEmbeds(embedBuilder.build()).complete();
                     });
-                }
-            });
+                });
+            }
         });
-
     }
 
+    private static @NonNull EmbedBuilder createUserAgentsDisplayEmbedBuilder(@NonNull Map<Long /* discord user id */, List<String /* agent name */>> userForAgents,
+                                                                             @NonNull Map<Long, String> memberNames) {
+        EmbedBuilder embedBuilder = new EmbedBuilder();
+        StringBuilder description = new StringBuilder();
 
+        userForAgents.forEach((discordUserId, agents) -> {
+            String name = memberNames.getOrDefault(discordUserId, USER_NOT_FOUND_FALLBACK);
+            List<String> agentsWithName = agents.stream().filter(agent -> !agent.startsWith(DISCORD_EMOJI_PREFIX)).toList();
+            List<String> agentsWithEmoji = agents.stream().filter(agent -> agent.startsWith(DISCORD_EMOJI_PREFIX)).toList();
+
+            description.append("## ").append(name);
+
+            if (!agentsWithEmoji.isEmpty()) {
+                description.append("\n").append("## ").append(String.join(" ", agentsWithEmoji));
+            }
+            if (!agentsWithName.isEmpty()) {
+                description.append("\n").append(String.join(", ", agentsWithName));
+            }
+
+            description.append("\n");
+        });
+
+        embedBuilder.setDescription(description.toString());
+        embedBuilder.setColor(Color.decode(EMBED_RED));
+        return embedBuilder;
+    }
+
+    private static @NonNull Map<Long, String> getMemberIdForMemberMap(@NonNull List<Member> members) {
+        Map<Long, String> memberNames = new HashMap<>();
+        for (Member m : members) {
+            memberNames.put(m.getIdLong(), m.getEffectiveName());
+        }
+        return memberNames;
+    }
 }

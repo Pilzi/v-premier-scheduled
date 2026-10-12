@@ -21,7 +21,8 @@ public interface PollService {
                               @NonNull List<String> selectedAgents,
                               @NonNull Role role);
 
-    void updateAgentPollWithVotes(@NonNull List<Guild> guilds);
+
+    void updateAgentPollForSingleGuild(@NonNull Guild guild);
 
     void replyToSelectAgentsButtonEventWithAgentPoll(@NonNull ButtonInteractionEvent event);
 }

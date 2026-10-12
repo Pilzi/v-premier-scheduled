@@ -12,7 +12,6 @@ import io.github.pilzi.service.services.impl.ImportServiceImpl;
 import io.github.pilzi.service.services.impl.PollServiceImpl;
 import net.dv8tion.jda.api.components.selections.SelectOption;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
-import net.dv8tion.jda.api.events.interaction.component.GenericSelectMenuInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.events.message.poll.MessagePollVoteAddEvent;
 import net.dv8tion.jda.api.events.message.poll.MessagePollVoteRemoveEvent;
@@ -27,6 +26,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import static io.github.pilzi.discord.Bot.DOTENV;
+import static io.github.pilzi.discord.utils.Message.DropdownUtil.AGENT_SELECTION_CUSTOM_ID_PREFIX;
 import static io.github.pilzi.service.services.impl.ImportServiceImpl.HENRIKDEV_API_KEY_ENV;
 import static io.github.pilzi.service.services.impl.ImportServiceImpl.VALORANT_REGION_ENV;
 import static io.github.pilzi.service.services.impl.PollServiceImpl.AGENT_SELECTION_BUTTON_ID;
@@ -59,6 +59,7 @@ public class BotListener extends ListenerAdapter {
     @NonNull
     private final PollService pollService = new PollServiceImpl(eventWorker, guildWorker, activePollWorker, activePollEventReferenceWorker, hibernateSessionFactoryService, activePollVoteWorker, agentVoteWorker);
 
+
     @Override
     public void onReady(@NonNull ReadyEvent event) {
         // Schedule regular event to fill the database with premier event data
@@ -66,9 +67,6 @@ public class BotListener extends ListenerAdapter {
 
         // Check if there is an active poll for the next event week
         scheduler.scheduleAtFixedRate(() -> pollService.handlePollsForGuilds(event.getJDA().getGuilds()), SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.HOURS);
-
-        // Add votes of other users to agent poll message
-        scheduler.scheduleAtFixedRate(() -> pollService.updateAgentPollWithVotes(event.getJDA().getGuilds()), SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.MINUTES);
     }
 
     @Override
@@ -80,16 +78,22 @@ public class BotListener extends ListenerAdapter {
 
     @Override
     public void onStringSelectInteraction(@NonNull StringSelectInteractionEvent event) {
-        List<String> selectedAgents = event.getInteraction().getSelectedOptions().stream()
-                .map(SelectOption::getValue)
-                .toList();
+        if (event.getCustomId().startsWith(AGENT_SELECTION_CUSTOM_ID_PREFIX)) {
+            event.deferEdit().queue();
 
-        pollService.importSelectedAgents(
-                Objects.requireNonNull(event.getGuild()).getIdLong(),
-                event.getMessageIdLong(),
-                event.getInteraction().getUser().getIdLong(),
-                selectedAgents,
-                Role.getRoleByCustomComponentId(event.getCustomId()));
+            List<String> selectedAgents = event.getInteraction().getSelectedOptions().stream()
+                    .map(SelectOption::getValue)
+                    .toList();
+
+            pollService.importSelectedAgents(
+                    Objects.requireNonNull(event.getGuild()).getIdLong(),
+                    event.getMessageIdLong(),
+                    event.getInteraction().getUser().getIdLong(),
+                    selectedAgents,
+                    Role.getRoleByCustomComponentId(event.getCustomId()));
+
+            pollService.updateAgentPollForSingleGuild(event.getGuild());
+        }
     }
 
     @Override
@@ -100,10 +104,5 @@ public class BotListener extends ListenerAdapter {
     @Override
     public void onMessagePollVoteRemove(@NonNull MessagePollVoteRemoveEvent event) {
         pollService.removeScheduleVote(event.getUserIdLong(), event.getAnswerId(), event.getMessageIdLong());
-    }
-
-    @Override
-    public void onGenericSelectMenuInteraction(@NonNull GenericSelectMenuInteractionEvent<?, ?> event) {
-        event.deferEdit().queue();
     }
 }
