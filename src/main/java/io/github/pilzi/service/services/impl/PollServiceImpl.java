@@ -87,6 +87,7 @@ public class PollServiceImpl implements PollService {
                 if (isActivePollExpired(activePollEntity)) {
                     session.remove(activePollEntity);
                     activePollEntity = null;
+                    session.flush();
                 }
 
                 if (doesActivePollNotExist(activePollEntity)) {
