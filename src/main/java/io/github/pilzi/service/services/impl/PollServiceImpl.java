@@ -42,6 +42,8 @@ public class PollServiceImpl implements PollService {
     public static final String EMBED_RED = "#FF4655";
     @NonNull
     public static final String USER_NOT_FOUND_FALLBACK = "Unknown user";
+    public static final String AGENT_VOTE_NOT_POSSIBLE_ANYMORE = "Since the week is over, voting is no longer possible";
+    public static final String CLICK_HERE_TO_GO_TO_THE_CURRENT_POLL_TEXT = "Click here to go to the current poll ";
 
     @NonNull
     private final EventWorker eventWorker;
@@ -129,7 +131,7 @@ public class PollServiceImpl implements PollService {
     }
 
     private static boolean doesActivePollNotExist(@Nullable ActivePollEntity activePollEntity) {
-        return activePollEntity == null || activePollEntity.getMessageId() == null;
+        return isActivePollOrMessageIdNull(activePollEntity);
     }
 
     private static boolean isActivePollExpired(@Nullable ActivePollEntity activePollEntity) {
@@ -150,18 +152,45 @@ public class PollServiceImpl implements PollService {
     @Override
     public void replyToSelectAgentsButtonEventWithAgentPoll(@NonNull ButtonInteractionEvent event) {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
-            List<EventEntity> eventsInCurrentWeek = eventWorker.collectEventsForCurrentWeek(session);
-            String text = "## ⚔️ Agent Selection\n" + "Which agents would you like to play on " + "**" + getMap(eventsInCurrentWeek) + "**?\n" + LINE_BREAK_AT_THE_END_CODE;
-
             ActivePollEntity scheduledActivePoll = activePollWorker.getScheduledActivePoll(session, Objects.requireNonNull(event.getGuild()).getIdLong());
-            List<AgentVoteEntity> agentVotes = agentVoteWorker.getVotesForUser(session, Objects.requireNonNull(scheduledActivePoll.getId()), event.getUser().getIdLong());
 
-            Map<Role, List<String>> userForAgents = AgentVoteUtil.collectAgentsForRole(agentVotes);
+            if (isActivePollOrMessageIdNull(scheduledActivePoll)) {
+                replyToEventWithVoteNotPossible(event, AGENT_VOTE_NOT_POSSIBLE_ANYMORE);
+            } else if (scheduledActivePoll.getMessageId() != event.getMessageIdLong()) {
+                event.getChannel().retrieveMessageById(scheduledActivePoll.getMessageId()).queue(message -> {
+                    String jumpUrl = message.getJumpUrl();
+                    replyToEventWithVoteNotPossible(event, AGENT_VOTE_NOT_POSSIBLE_ANYMORE + "\n" + CLICK_HERE_TO_GO_TO_THE_CURRENT_POLL_TEXT + jumpUrl);
+                }, _ -> replyToEventWithVoteNotPossible(event, AGENT_VOTE_NOT_POSSIBLE_ANYMORE));
 
-            List<ActionRow> actionRows = new ArrayList<>(DropdownUtil.buildAgendActionRows(userForAgents));
-
-            event.reply(text).addComponents(actionRows).setEphemeral(true).complete();
+            } else {
+                replyToEventWithAgentPoll(event, session, scheduledActivePoll);
+            }
         });
+    }
+
+    private void replyToEventWithAgentPoll(@NonNull ButtonInteractionEvent event, Session session, ActivePollEntity scheduledActivePoll) {
+        List<EventEntity> eventsInCurrentWeek = eventWorker.collectEventsForCurrentWeek(session);
+        List<AgentVoteEntity> agentVotes = agentVoteWorker.getVotesForUser(session, Objects.requireNonNull(scheduledActivePoll.getId()), event.getUser().getIdLong());
+
+        String text = "## ⚔️ Agent Selection\n" + "Which agents would you like to play on " + "**" + getMap(eventsInCurrentWeek) + "**?\n" + LINE_BREAK_AT_THE_END_CODE;
+
+        Map<Role, List<String>> userForAgents = AgentVoteUtil.collectAgentsForRole(agentVotes);
+
+        List<ActionRow> actionRows = new ArrayList<>(DropdownUtil.buildAgendActionRows(userForAgents));
+
+        event.reply(text).addComponents(actionRows)
+                .setEphemeral(true)
+                .queue();
+    }
+
+    private static void replyToEventWithVoteNotPossible(@NonNull ButtonInteractionEvent event, String agentVoteNotPossibleAnymore) {
+        event.reply(agentVoteNotPossibleAnymore)
+                .setEphemeral(true)
+                .queue();
+    }
+
+    private static boolean isActivePollOrMessageIdNull(@Nullable ActivePollEntity scheduledActivePoll) {
+        return scheduledActivePoll == null || scheduledActivePoll.getMessageId() == null;
     }
 
     private static @NonNull String getMap(@NonNull List<EventEntity> eventsInCurrentWeek) {
@@ -215,12 +244,18 @@ public class PollServiceImpl implements PollService {
                 List<Long> userIdsToFetch = new ArrayList<>(userForAgents.keySet());
 
                 textChannelOptional.get().retrieveMessageById(scheduledActivePoll.getMessageId()).queue(message -> {
-                    guild.retrieveMembersByIds(userIdsToFetch).onSuccess(members -> {
-                        Map<Long, String> memberNames = getMemberIdForMemberMap(members);
+                    if (!userForAgents.isEmpty()) {
+                        message.suppressEmbeds(false).queue();
 
-                        EmbedBuilder embedBuilder = createUserAgentsDisplayEmbedBuilder(userForAgents, memberNames);
-                        message.editMessageEmbeds(embedBuilder.build()).complete();
-                    });
+                        guild.retrieveMembersByIds(userIdsToFetch).onSuccess(members -> {
+                            Map<Long, String> memberNames = getMemberIdForMemberMap(members);
+
+                            EmbedBuilder embedBuilder = createUserAgentsDisplayEmbedBuilder(userForAgents, memberNames);
+                            message.editMessageEmbeds(embedBuilder.build()).complete();
+                        });
+                    } else {
+                        message.suppressEmbeds(true).queue();
+                    }
                 });
             }
         });
