@@ -39,7 +39,7 @@ LANGUAGE=<de | en>
 POLL_CHANNEL_NAME=<discord channel name>
 ```
 
-## 🚀 Installation & Start (Docker Compose)
+## Installation
 
 The easiest way to run the bot is via Docker Compose. Ensure that [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) are installed on your system.
 
