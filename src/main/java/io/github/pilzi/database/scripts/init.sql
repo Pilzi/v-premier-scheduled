@@ -26,18 +26,16 @@ CREATE TABLE guild
     name       VARCHAR(100)
 );
 
-CREATE TYPE poll_type AS ENUM ('SCHEDULE','AGENT');
 CREATE TABLE active_poll
 (
     id         BIGINT       NOT NULL PRIMARY KEY,
     start_at   TIMESTAMP(6) NOT NULL,
     message_id BIGINT UNIQUE,
     end_at     TIMESTAMP(6) NOT NULL,
-    poll_type  POLL_TYPE    NOT NULL,
     guild_id   BIGINT       NOT NULL
         CONSTRAINT guild_id_guild_fk
             REFERENCES guild ON DELETE CASCADE ON UPDATE CASCADE,
-    UNIQUE (guild_id, poll_type)
+    UNIQUE (guild_id)
 );
 
 CREATE TABLE active_poll_event_reference

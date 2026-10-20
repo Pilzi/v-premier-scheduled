@@ -1,7 +1,6 @@
 package io.github.pilzi.service.services.impl;
 
 import io.github.pilzi.database.domain.*;
-import io.github.pilzi.database.enums.PollType;
 import io.github.pilzi.database.utils.AgentVoteUtil;
 import io.github.pilzi.database.utils.TransactionalUtil;
 import io.github.pilzi.database.workers.*;
@@ -95,7 +94,9 @@ public class PollServiceImpl implements PollService {
                 }
 
                 if (isActivePollOrMessageIdNull(activePollEntity)) {
-                    ActivePollEntity newCreatedActivePollEntity = new ActivePollEntity(CalendarUtil.getFirstInstantOfCurrentWeek(), CalendarUtil.getLastInstantOfCurrentWeek(), PollType.SCHEDULE, guildEntity);
+                    ActivePollEntity newCreatedActivePollEntity = new ActivePollEntity(CalendarUtil.getFirstInstantOfCurrentWeek(),
+                            CalendarUtil.getLastInstantOfCurrentWeek(),
+                            guildEntity);
                     session.persist(newCreatedActivePollEntity);
 
                     eventsInCurrentWeekToPollEventReferences(eventsInCurrentWeek, newCreatedActivePollEntity, session);
