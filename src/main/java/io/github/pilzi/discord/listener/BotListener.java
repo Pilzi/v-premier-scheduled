@@ -12,6 +12,7 @@ import io.github.pilzi.service.services.impl.ImportServiceImpl;
 import io.github.pilzi.service.services.impl.PollServiceImpl;
 import net.dv8tion.jda.api.components.selections.SelectOption;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.GenericSelectMenuInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -24,10 +25,10 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import static io.github.pilzi.discord.Bot.DOTENV;
+import static io.github.pilzi.discord.utils.Message.ButtonUtil.AGENT_SELECTION_BUTTON_ID;
 import static io.github.pilzi.discord.utils.Message.DropdownUtil.AGENT_SELECTION_CUSTOM_ID_PREFIX;
 import static io.github.pilzi.service.services.impl.ImportServiceImpl.HENRIKDEV_API_KEY_ENV;
 import static io.github.pilzi.service.services.impl.ImportServiceImpl.VALORANT_REGION_ENV;
-import static io.github.pilzi.service.services.impl.PollServiceImpl.AGENT_SELECTION_BUTTON_ID;
 
 public class BotListener extends ListenerAdapter {
     public static final int SCHEDULE_PERIOD_IN_HOURS = 2;
@@ -65,7 +66,7 @@ public class BotListener extends ListenerAdapter {
         scheduler.scheduleAtFixedRate(importService::importPremierData, SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.HOURS);
 
         // Check if there is an active poll for the next event week
-        scheduler.scheduleAtFixedRate(() -> pollService.handlePollsForGuilds(event.getJDA().getGuilds()), SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.HOURS);
+        scheduler.scheduleAtFixedRate(() -> pollService.handleScheduledPollForAllGuilds(event.getJDA().getGuilds()), SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.HOURS);
     }
 
     @Override

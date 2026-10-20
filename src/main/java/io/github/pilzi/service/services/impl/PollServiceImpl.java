@@ -7,14 +7,15 @@ import io.github.pilzi.database.workers.*;
 import io.github.pilzi.discord.enums.Role;
 import io.github.pilzi.discord.utils.GuildUtil;
 import io.github.pilzi.discord.utils.LanguageUtil;
+import io.github.pilzi.discord.utils.Message.ButtonUtil;
 import io.github.pilzi.discord.utils.Message.DropdownUtil;
+import io.github.pilzi.discord.utils.Message.EmbedUtil;
 import io.github.pilzi.discord.utils.Message.PollUtil;
 import io.github.pilzi.service.services.HibernateSessionFactoryService;
 import io.github.pilzi.service.services.PollService;
 import io.github.pilzi.service.utils.CalendarUtil;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
-import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Message;
@@ -32,15 +33,7 @@ import java.util.List;
 
 public class PollServiceImpl implements PollService {
     @NonNull
-    public static final String AGENT_SELECTION_BUTTON_ID = "agent-selection-button";
-    @NonNull
-    public static final String DISCORD_EMOJI_PREFIX = "<";
-    @NonNull
     public static final String LINE_BREAK_AT_THE_END_CODE = "\u200B";
-    @NonNull
-    public static final String EMBED_RED = "#FF4655";
-    @NonNull
-    public static final String USER_NOT_FOUND_FALLBACK = "Unknown user";
 
     @NonNull
     private final EventWorker eventWorker;
@@ -70,17 +63,13 @@ public class PollServiceImpl implements PollService {
     }
 
     @Override
-    public void handlePollsForGuilds(@NonNull List<Guild> guilds) {
-        handleScheduledPollForAllGuilds(guilds);
-    }
-
-    private void handleScheduledPollForAllGuilds(@NonNull List<Guild> guilds) {
+    public void handleScheduledPollForAllGuilds(@NonNull List<Guild> guilds) {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             List<EventEntity> eventsInCurrentWeek = eventWorker.collectEventsForCurrentWeek(session);
 
             guilds.forEach(guild -> {
                 GuildEntity guildEntity = guildWorker.getOrCreate(session, guild);
-                ActivePollEntity activePollEntity = activePollWorker.getScheduledActivePoll(session, guild.getIdLong());
+                ActivePollEntity activePollEntity = activePollWorker.getActivePoll(session, guild.getIdLong());
 
                 if (isActivePollExpired(activePollEntity)) {
                     session.remove(activePollEntity);
@@ -104,19 +93,20 @@ public class PollServiceImpl implements PollService {
         });
     }
 
-
     private static boolean isActivePollExpired(@Nullable ActivePollEntity activePollEntity) {
         return activePollEntity == null || !CalendarUtil.doesMatchWeekBounds(activePollEntity.getStartAt(), activePollEntity.getEndAt());
     }
 
 
-    private static void sendScheduledPoll(@NonNull GuildChannel guildChannel, @NonNull List<EventEntity> eventsInCurrentWeek, @NonNull ActivePollEntity newCreatedActivePollEntity) {
+    private static void sendScheduledPoll(@NonNull GuildChannel guildChannel,
+                                          @NonNull List<EventEntity> eventsInCurrentWeek,
+                                          @NonNull ActivePollEntity newCreatedActivePollEntity) {
         String channelId = guildChannel.getId();
         TextChannel textChannel = guildChannel.getGuild().getTextChannelById(channelId);
         if (textChannel != null) {
             Message sentMessage = textChannel.sendMessage("")
                     .setPoll(PollUtil.buildEventPoll(getMap(eventsInCurrentWeek), eventsInCurrentWeek))
-                    .addComponents(ActionRow.of(Button.primary(AGENT_SELECTION_BUTTON_ID, LanguageUtil.getSelectAgentsText())))
+                    .addComponents(ButtonUtil.getAgentSelectionButton())
                     .complete();
 
             newCreatedActivePollEntity.setMessageId(sentMessage.getIdLong());
@@ -126,21 +116,24 @@ public class PollServiceImpl implements PollService {
     @Override
     public void replyToSelectAgentsButtonEventWithAgentPoll(@NonNull ButtonInteractionEvent event) {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
-            ActivePollEntity scheduledActivePoll = activePollWorker.getScheduledActivePoll(session, Objects.requireNonNull(event.getGuild()).getIdLong());
+            ActivePollEntity scheduledActivePoll = activePollWorker.getActivePoll(session, Objects.requireNonNull(event.getGuild()).getIdLong());
 
             if (isActivePollOrMessageIdNull(scheduledActivePoll)) {
                 replyToEventWithVoteNotPossible(event, LanguageUtil.getAgentVoteNotPossibleAnymore());
             } else if (scheduledActivePoll.getMessageId() != event.getMessageIdLong()) {
-                event.getChannel().retrieveMessageById(scheduledActivePoll.getMessageId()).queue(message -> {
-                    String jumpUrl = message.getJumpUrl();
-                    replyToEventWithVoteNotPossible(event,
-                            getVoteNotPossibleWithJumpUrl(jumpUrl));
-                }, _ -> replyToEventWithVoteNotPossible(event, LanguageUtil.getAgentVoteNotPossibleAnymore()));
-
+                replyToEventWithVoteNotPossibleAndLinkToActivePoll(event, scheduledActivePoll);
             } else {
                 replyToEventWithAgentPoll(event, session, scheduledActivePoll);
             }
         });
+    }
+
+    private static void replyToEventWithVoteNotPossibleAndLinkToActivePoll(@NonNull ButtonInteractionEvent event,
+                                                                           @NonNull ActivePollEntity scheduledActivePoll) {
+        event.getChannel().retrieveMessageById(scheduledActivePoll.getMessageId()).queue(message -> {
+            String jumpUrl = message.getJumpUrl();
+            replyToEventWithVoteNotPossible(event, getVoteNotPossibleWithJumpUrl(jumpUrl));
+        }, _ -> replyToEventWithVoteNotPossible(event, LanguageUtil.getAgentVoteNotPossibleAnymore()));
     }
 
     private static @NonNull String getVoteNotPossibleWithJumpUrl(@NonNull String jumpUrl) {
@@ -156,8 +149,6 @@ public class PollServiceImpl implements PollService {
             replyToEventWithVoteNotPossible(event, LanguageUtil.getAgentVoteNotPossibleAnymore());
         } else {
             List<AgentVoteEntity> agentVotes = agentVoteWorker.getVotesForUser(session, Objects.requireNonNull(scheduledActivePoll.getId()), event.getUser().getIdLong());
-
-
 
             String text = LanguageUtil.getAgentSelectionText("**" + getMap(eventsInCurrentWeek) + "**") + "\n" + LINE_BREAK_AT_THE_END_CODE;
 
@@ -195,8 +186,8 @@ public class PollServiceImpl implements PollService {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             // Delete all existing agents with this specific role
             agentVoteWorker.deleteVoteByRole(session, role, discordUserId);
-            ActivePollEntity scheduledActivePoll = Objects.requireNonNull(activePollWorker.getScheduledActivePoll(session, guildId));
-
+            ActivePollEntity scheduledActivePoll = Objects.requireNonNull(activePollWorker.getActivePoll(session, guildId));
+            // Save all selected agents in database
             selectedAgents.forEach(agent -> session.persist(new AgentVoteEntity(discordUserId, agent, role, scheduledActivePoll)));
         });
     }
@@ -205,7 +196,7 @@ public class PollServiceImpl implements PollService {
     public void updateAgentPollForSingleGuild(@NonNull Guild guild) {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
 
-            ActivePollEntity scheduledActivePoll = activePollWorker.getScheduledActivePoll(session, guild.getIdLong());
+            ActivePollEntity scheduledActivePoll = activePollWorker.getActivePoll(session, guild.getIdLong());
             Optional<TextChannel> textChannelOptional = GuildUtil.findChannelInGuild(guild);
 
             if (textChannelOptional.isPresent()) {
@@ -216,14 +207,7 @@ public class PollServiceImpl implements PollService {
 
                 textChannelOptional.get().retrieveMessageById(scheduledActivePoll.getMessageId()).queue(message -> {
                     if (!userForAgents.isEmpty()) {
-                        message.suppressEmbeds(false).queue();
-
-                        guild.retrieveMembersByIds(userIdsToFetch).onSuccess(members -> {
-                            Map<Long, String> memberNames = getMemberIdForMemberMap(members);
-
-                            EmbedBuilder embedBuilder = createUserAgentsDisplayEmbedBuilder(userForAgents, memberNames);
-                            message.editMessageEmbeds(embedBuilder.build()).complete();
-                        });
+                        updateMessageAgentEmbeds(guild, message, userIdsToFetch, userForAgents);
                     } else {
                         message.suppressEmbeds(true).queue();
                     }
@@ -232,31 +216,18 @@ public class PollServiceImpl implements PollService {
         });
     }
 
-    private static @NonNull EmbedBuilder createUserAgentsDisplayEmbedBuilder(@NonNull Map<Long /* discord user id */, List<String /* agent name */>> userForAgents,
-                                                                             @NonNull Map<Long, String> memberNames) {
-        EmbedBuilder embedBuilder = new EmbedBuilder();
-        StringBuilder description = new StringBuilder();
+    private static void updateMessageAgentEmbeds(@NonNull Guild guild,
+                                                 @NonNull Message message,
+                                                 @NonNull List<Long> userIdsToFetch,
+                                                 @NonNull Map<Long, List<String>> userForAgents) {
+        message.suppressEmbeds(false).queue();
 
-        userForAgents.forEach((discordUserId, agents) -> {
-            String name = memberNames.getOrDefault(discordUserId, USER_NOT_FOUND_FALLBACK);
-            List<String> agentsWithName = agents.stream().filter(agent -> !agent.startsWith(DISCORD_EMOJI_PREFIX)).toList();
-            List<String> agentsWithEmoji = agents.stream().filter(agent -> agent.startsWith(DISCORD_EMOJI_PREFIX)).toList();
+        guild.retrieveMembersByIds(userIdsToFetch).onSuccess(members -> {
+            Map<Long, String> memberNames = getMemberIdForMemberMap(members);
 
-            description.append("## ").append(name);
-
-            if (!agentsWithEmoji.isEmpty()) {
-                description.append("\n").append("## ").append(String.join(" ", agentsWithEmoji));
-            }
-            if (!agentsWithName.isEmpty()) {
-                description.append("\n").append(String.join(", ", agentsWithName));
-            }
-
-            description.append("\n");
+            EmbedBuilder embedBuilder = EmbedUtil.createUserAgentsDisplayEmbedBuilder(userForAgents, memberNames);
+            message.editMessageEmbeds(embedBuilder.build()).complete();
         });
-
-        embedBuilder.setDescription(description.toString());
-        embedBuilder.setColor(Color.decode(EMBED_RED));
-        return embedBuilder;
     }
 
     private static @NonNull Map<Long, String> getMemberIdForMemberMap(@NonNull List<Member> members) {

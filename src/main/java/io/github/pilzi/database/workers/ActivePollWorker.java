@@ -7,14 +7,8 @@ import org.jspecify.annotations.Nullable;
 
 public class ActivePollWorker {
     @Nullable
-    public ActivePollEntity getScheduledActivePoll(@NonNull Session session,
-                                                   @NonNull Long discordGuildId) {
-        return getActivePoll(session, discordGuildId);
-    }
-
-    @Nullable
-    private ActivePollEntity getActivePoll(@NonNull Session session,
-                                           @NonNull Long discordGuildId) {
+    public ActivePollEntity getActivePoll(@NonNull Session session,
+                                          @NonNull Long discordGuildId) {
         return session.createQuery("SELECT activePoll" +
                         " FROM ActivePollEntity activePoll" +
                         " WHERE activePoll.guild.discordId = :discordGuildId", ActivePollEntity.class)

@@ -30,6 +30,7 @@ public class PollUtil {
     public static final String HOUR_SEPARATOR = " - ";
     @NonNull
     public static final String WEEKDAY_DATE_SEPARATOR = " ";
+
     @NonNull
     public static MessagePollData buildEventPoll(@NonNull String title,
                                                  @NonNull List<EventEntity> eventsInCurrentWeek) {
@@ -57,4 +58,6 @@ public class PollUtil {
             .setDuration(Duration.ofDays(DEFAULT_POLL_DURATION_DAYS))
             .build();
     }
+
+
 }
