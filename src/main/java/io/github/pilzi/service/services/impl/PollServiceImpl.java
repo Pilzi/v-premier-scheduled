@@ -175,17 +175,24 @@ public class PollServiceImpl implements PollService {
                                            @NonNull Session session,
                                            @NonNull ActivePollEntity scheduledActivePoll) {
         List<EventEntity> eventsInCurrentWeek = eventWorker.collectEventsForCurrentWeek(session);
-        List<AgentVoteEntity> agentVotes = agentVoteWorker.getVotesForUser(session, Objects.requireNonNull(scheduledActivePoll.getId()), event.getUser().getIdLong());
 
-        String text = LanguageUtil.getAgentSelectionText("**" + getMap(eventsInCurrentWeek) + "**") + "\n" + LINE_BREAK_AT_THE_END_CODE;
+        if (eventsInCurrentWeek.isEmpty()) {
+            replyToEventWithVoteNotPossible(event, LanguageUtil.getAgentVoteNotPossibleAnymore());
+        } else {
+            List<AgentVoteEntity> agentVotes = agentVoteWorker.getVotesForUser(session, Objects.requireNonNull(scheduledActivePoll.getId()), event.getUser().getIdLong());
 
-        Map<Role, List<String>> userForAgents = AgentVoteUtil.collectAgentsForRole(agentVotes);
 
-        List<ActionRow> actionRows = new ArrayList<>(DropdownUtil.buildAgendActionRows(userForAgents));
 
-        event.reply(text).addComponents(actionRows)
-                .setEphemeral(true)
-                .queue();
+            String text = LanguageUtil.getAgentSelectionText("**" + getMap(eventsInCurrentWeek) + "**") + "\n" + LINE_BREAK_AT_THE_END_CODE;
+
+            Map<Role, List<String>> userForAgents = AgentVoteUtil.collectAgentsForRole(agentVotes);
+
+            List<ActionRow> actionRows = new ArrayList<>(DropdownUtil.buildAgendActionRows(userForAgents));
+
+            event.reply(text).addComponents(actionRows)
+                    .setEphemeral(true)
+                    .queue();
+        }
     }
 
     private static void replyToEventWithVoteNotPossible(@NonNull ButtonInteractionEvent event,
