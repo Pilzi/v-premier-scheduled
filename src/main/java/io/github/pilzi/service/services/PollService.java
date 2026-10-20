@@ -11,10 +11,6 @@ public interface PollService {
 
     void handlePollsForGuilds(@NonNull List<Guild> guilds);
 
-    void addScheduleVote(long userId, long answerId, long messageId);
-
-    void removeScheduleVote(long userId, long answerId, long messageId);
-
     void importSelectedAgents(@NonNull Long guildId,
                               @NonNull Long messageId,
                               @NonNull Long discordUserId,

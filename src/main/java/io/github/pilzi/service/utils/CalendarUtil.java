@@ -42,11 +42,8 @@ public class CalendarUtil {
 
     public static boolean doesMatchWeekBounds(@NonNull Instant start,
                                               @NonNull Instant end) {
-        LocalDate firstDayOfCurrentWeek = CalendarUtil.getFirstDayOfCurrentWeek();
-        LocalDate firstDayOfNextWeek = CalendarUtil.getFirstDayOfNextWeek();
-
-        return firstDayOfCurrentWeek.isEqual(LocalDate.ofInstant(start, ZoneId.systemDefault()))
-                && firstDayOfNextWeek.isEqual(LocalDate.ofInstant(end, ZoneId.systemDefault()));
+        return getFirstInstantOfCurrentWeek().equals(start)
+                && getLastInstantOfCurrentWeek().equals(end);
     }
 
     public static boolean isInCurrentWeek(@NonNull Instant start,

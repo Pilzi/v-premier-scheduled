@@ -38,35 +38,6 @@ CREATE TABLE active_poll
     UNIQUE (guild_id)
 );
 
-CREATE TABLE active_poll_event_reference
-(
-    active_poll_id BIGINT NOT NULL
-        CONSTRAINT active_poll_id_active_poll_fk
-            REFERENCES active_poll ON DELETE CASCADE ON UPDATE CASCADE,
-    event_id       BIGINT NOT NULL
-        CONSTRAINT event_id_event_fk
-            REFERENCES event ON DELETE CASCADE ON UPDATE CASCADE,
-    order_index    BIGINT NOT NULL,
-    CONSTRAINT active_poll_event_reference_pk
-        PRIMARY KEY (active_poll_id, event_id),
-    CONSTRAINT active_poll_event_reference_order_unique
-        UNIQUE (active_poll_id, order_index)
-);
-
-CREATE TABLE active_poll_vote
-(
-    id             BIGINT NOT NULL PRIMARY KEY,
-    active_poll_id BIGINT NOT NULL,
-    event_id       BIGINT NOT NULL,
-    user_id        BIGINT NOT NULL,
-    CONSTRAINT active_poll_vote_reference_fk
-        FOREIGN KEY (active_poll_id, event_id)
-            REFERENCES active_poll_event_reference (active_poll_id, event_id)
-            ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT active_poll_vote_unique
-        UNIQUE (active_poll_id, event_id, user_id)
-);
-
 CREATE TABLE hibernate_sequences
 (
     sequence_name VARCHAR(255) NOT NULL PRIMARY KEY,

@@ -13,8 +13,6 @@ import io.github.pilzi.service.services.impl.PollServiceImpl;
 import net.dv8tion.jda.api.components.selections.SelectOption;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
-import net.dv8tion.jda.api.events.message.poll.MessagePollVoteAddEvent;
-import net.dv8tion.jda.api.events.message.poll.MessagePollVoteRemoveEvent;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.jspecify.annotations.NonNull;
@@ -53,11 +51,12 @@ public class BotListener extends ListenerAdapter {
     @NonNull
     private final GuildWorker guildWorker = new GuildWorker();
     @NonNull
-    private final ActivePollEventReferenceWorker activePollEventReferenceWorker = new ActivePollEventReferenceWorker();
-    @NonNull
-    private final ActivePollVoteWorker activePollVoteWorker = new ActivePollVoteWorker();
-    @NonNull
-    private final PollService pollService = new PollServiceImpl(eventWorker, guildWorker, activePollWorker, activePollEventReferenceWorker, hibernateSessionFactoryService, activePollVoteWorker, agentVoteWorker);
+    private final PollService pollService = new PollServiceImpl(
+            eventWorker,
+            guildWorker,
+            activePollWorker,
+            hibernateSessionFactoryService,
+            agentVoteWorker);
 
 
     @Override
@@ -94,15 +93,5 @@ public class BotListener extends ListenerAdapter {
 
             pollService.updateAgentPollForSingleGuild(event.getGuild());
         }
-    }
-
-    @Override
-    public void onMessagePollVoteAdd(@NonNull MessagePollVoteAddEvent event) {
-        pollService.addScheduleVote(event.getUserIdLong(), event.getAnswerId(), event.getMessageIdLong());
-    }
-
-    @Override
-    public void onMessagePollVoteRemove(@NonNull MessagePollVoteRemoveEvent event) {
-        pollService.removeScheduleVote(event.getUserIdLong(), event.getAnswerId(), event.getMessageIdLong());
     }
 }

@@ -28,7 +28,6 @@ import org.jspecify.annotations.Nullable;
 import java.awt.*;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 
 public class PollServiceImpl implements PollService {
@@ -53,24 +52,20 @@ public class PollServiceImpl implements PollService {
     private final ActivePollWorker activePollWorker;
 
     @NonNull
-    private final ActivePollEventReferenceWorker activePollEventReferenceWorker;
-
-    @NonNull
     private final HibernateSessionFactoryService hibernateSessionFactoryService;
-
-    @NonNull
-    private final ActivePollVoteWorker activePollVoteWorker;
 
     @NonNull
     private final AgentVoteWorker agentVoteWorker;
 
-    public PollServiceImpl(@NonNull EventWorker eventWorker, @NonNull GuildWorker guildWorker, @NonNull ActivePollWorker activePollWorker, @NonNull ActivePollEventReferenceWorker activePollEventReferenceWorker, @NonNull HibernateSessionFactoryService hibernateSessionFactoryService, @NonNull ActivePollVoteWorker activePollVoteWorker, @NonNull AgentVoteWorker agentVoteWorker) {
+    public PollServiceImpl(@NonNull EventWorker eventWorker,
+                           @NonNull GuildWorker guildWorker,
+                           @NonNull ActivePollWorker activePollWorker,
+                           @NonNull HibernateSessionFactoryService hibernateSessionFactoryService,
+                           @NonNull AgentVoteWorker agentVoteWorker) {
         this.eventWorker = eventWorker;
         this.guildWorker = guildWorker;
         this.activePollWorker = activePollWorker;
-        this.activePollEventReferenceWorker = activePollEventReferenceWorker;
         this.hibernateSessionFactoryService = hibernateSessionFactoryService;
-        this.activePollVoteWorker = activePollVoteWorker;
         this.agentVoteWorker = agentVoteWorker;
     }
 
@@ -99,8 +94,6 @@ public class PollServiceImpl implements PollService {
                             guildEntity);
                     session.persist(newCreatedActivePollEntity);
 
-                    eventsInCurrentWeekToPollEventReferences(eventsInCurrentWeek, newCreatedActivePollEntity, session);
-
                     Optional<TextChannel> textChannelOptional = GuildUtil.findChannelInGuild(guild);
 
                     if (textChannelOptional.isPresent()) {
@@ -111,27 +104,9 @@ public class PollServiceImpl implements PollService {
         });
     }
 
-    /**
-     * Gives each {@link ActivePollEventReferenceEntity} an increasing index
-     * based on time, so the earliest event comes first. This allows us to
-     * tell the poll choices apart when saving them via Hibernate.
-     *
-     * @param eventsInCurrentWeek        All event entities for the current week
-     * @param newCreatedActivePollEntity The poll object currently being created
-     * @param session                    The active Hibernate session
-     */
-    private static void eventsInCurrentWeekToPollEventReferences(@NonNull List<EventEntity> eventsInCurrentWeek, @NonNull ActivePollEntity newCreatedActivePollEntity, @NonNull Session session) {
-        AtomicInteger orderIndex = new AtomicInteger(1);
-
-        eventsInCurrentWeek.stream().sorted(Comparator.comparing(EventEntity::getStartAt)).map((eventInCurrentWeek) -> {
-            int orderIndexValue = orderIndex.get();
-            orderIndex.set(orderIndexValue + 1);
-            return new ActivePollEventReferenceEntity(newCreatedActivePollEntity, eventInCurrentWeek, orderIndexValue);
-        }).forEach(session::persist);
-    }
 
     private static boolean isActivePollExpired(@Nullable ActivePollEntity activePollEntity) {
-        return activePollEntity != null && !CalendarUtil.doesMatchWeekBounds(activePollEntity.getStartAt(), activePollEntity.getEndAt());
+        return activePollEntity == null || !CalendarUtil.doesMatchWeekBounds(activePollEntity.getStartAt(), activePollEntity.getEndAt());
     }
 
 
@@ -209,28 +184,6 @@ public class PollServiceImpl implements PollService {
 
     private static @NonNull String getMap(@NonNull List<EventEntity> eventsInCurrentWeek) {
         return eventsInCurrentWeek.getFirst().getMap();
-    }
-
-    @Override
-    public void addScheduleVote(long userId, long answerId, long messageId) {
-        TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
-            ActivePollEventReferenceEntity activePollEventReferenceEntity = activePollEventReferenceWorker.findByMessageIdAndIndex(session, messageId, answerId);
-
-            if (activePollEventReferenceEntity != null) {
-                session.persist(new ActivePollVoteEntity(userId, activePollEventReferenceEntity));
-            }
-        });
-    }
-
-    @Override
-    public void removeScheduleVote(long userId, long answerId, long messageId) {
-        TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
-            ActivePollVoteEntity activePollVoteEntity = activePollVoteWorker.find(session, answerId, messageId, userId);
-
-            if (activePollVoteEntity != null) {
-                session.remove(activePollVoteEntity);
-            }
-        });
     }
 
     @Override
