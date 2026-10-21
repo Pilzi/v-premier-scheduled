@@ -31,6 +31,8 @@ import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import org.hibernate.Session;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -39,6 +41,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 
 public class PollServiceImpl implements PollService {
+    @NonNull
+    private static final Logger logger = LoggerFactory.getLogger(PollServiceImpl.class);
     @NonNull
     public static final String LINE_BREAK_AT_THE_END_CODE = "\u200B";
 
@@ -77,34 +81,43 @@ public class PollServiceImpl implements PollService {
             List<EventEntity> eventsInCurrentWeek = eventWorker.collectEventsForCurrentWeek(session);
 
             guilds.forEach(guild -> {
-                GuildEntity guildEntity = guildWorker.getOrCreate(session, guild);
-                ActivePollEntity activePollEntity = activePollWorker.getActivePoll(session, guild.getIdLong());
-
-                if (isActivePollExpired(activePollEntity)) {
-                    session.remove(activePollEntity);
-                    activePollEntity = null;
-                    session.flush();
-                }
-
-                if (isActivePollOrMessageIdNull(activePollEntity)) {
-                    ActivePollEntity newCreatedActivePollEntity = new ActivePollEntity(CalendarUtil.getFirstInstantOfCurrentWeek(),
-                            CalendarUtil.getLastInstantOfCurrentWeek(),
-                            guildEntity);
-                    session.persist(newCreatedActivePollEntity);
-
-                    Optional<TextChannel> textChannelOptional = GuildUtil.findChannelInGuild(guild);
-
-                    if (textChannelOptional.isPresent()) {
-                        CompletableFuture<Void> future = sendScheduledPoll(textChannelOptional.get(), eventsInCurrentWeek, guild.getIdLong());
-                        if (future != null) {
-                            scheduledPolls.add(future);
-                        }
-                    }
+                try {
+                    handleScheduledPollForGuild(session, guild, eventsInCurrentWeek, scheduledPolls);
+                    throw new RuntimeException("test");
+                } catch (Exception e) {
+                    logger.error("unable to send active poll to guild with name: {}", guild.getName(), e);
                 }
             });
         });
 
         return scheduledPolls;
+    }
+
+    private void handleScheduledPollForGuild(Session session, Guild guild, List<EventEntity> eventsInCurrentWeek, List<CompletableFuture<?>> scheduledPolls) {
+        GuildEntity guildEntity = guildWorker.getOrCreate(session, guild);
+        ActivePollEntity activePollEntity = activePollWorker.getActivePoll(session, guild.getIdLong());
+
+        if (isActivePollExpired(activePollEntity)) {
+            session.remove(activePollEntity);
+            activePollEntity = null;
+            session.flush();
+        }
+
+        if (isActivePollOrMessageIdNull(activePollEntity)) {
+            ActivePollEntity newCreatedActivePollEntity = new ActivePollEntity(CalendarUtil.getFirstInstantOfCurrentWeek(),
+                    CalendarUtil.getLastInstantOfCurrentWeek(),
+                    guildEntity);
+            session.persist(newCreatedActivePollEntity);
+
+            Optional<TextChannel> textChannelOptional = GuildUtil.findChannelInGuild(guild);
+
+            if (textChannelOptional.isPresent()) {
+                CompletableFuture<Void> future = sendScheduledPoll(textChannelOptional.get(), eventsInCurrentWeek, guild.getIdLong());
+                if (future != null) {
+                    scheduledPolls.add(future);
+                }
+            }
+        }
     }
 
     private static boolean isActivePollExpired(@Nullable ActivePollEntity activePollEntity) {
@@ -247,7 +260,17 @@ public class PollServiceImpl implements PollService {
 
     @Override
     public @NonNull List<? extends CompletableFuture<?>> updateAgentPollForGuilds(@NonNull Set<Guild> guilds) {
-        return guilds.stream().map(this::updateAgentPollForSingleGuild).filter(Objects::nonNull).toList();
+        return guilds.stream()
+                .map(guild -> {
+                    try {
+                        return this.updateAgentPollForSingleGuild(guild);
+                    } catch (Exception e){
+                        logger.error("update agent poll error: guildName={} guildId={}", guild.getName(), guild.getId(), e);
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     @NonNull

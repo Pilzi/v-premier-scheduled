@@ -65,7 +65,7 @@ public class BotListener extends ListenerAdapter {
     @Override
     public void onReady(@NonNull ReadyEvent event) {
         // Schedule regular event to fill the database with premier event data
-        scheduler.scheduleAtFixedRate(importService::importPremierData, SCHEDULE_INITIAL_DELAY_IN_HOURS, IMPORT_AND_MESSAGE_DELAY_IN_HOURS, TimeUnit.HOURS);
+        // scheduler.scheduleAtFixedRate(importService::importPremierData, SCHEDULE_INITIAL_DELAY_IN_HOURS, IMPORT_AND_MESSAGE_DELAY_IN_HOURS, TimeUnit.HOURS);
 
         // Check if there is an active poll for the next event week
         scheduler.scheduleAtFixedRate(() -> botScheduler.resetGuildsToSendActivePollTo(event.getJDA().getGuilds()), SCHEDULE_INITIAL_DELAY_IN_HOURS, IMPORT_AND_MESSAGE_DELAY_IN_HOURS, TimeUnit.HOURS);
