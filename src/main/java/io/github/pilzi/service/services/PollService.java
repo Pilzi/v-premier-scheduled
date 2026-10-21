@@ -6,6 +6,8 @@ import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 public interface PollService {
 
@@ -17,7 +19,8 @@ public interface PollService {
      *
      * @param guilds the guilds to send the poll to
      */
-    void handleScheduledPollForAllGuilds(@NonNull List<Guild> guilds);
+    @NonNull
+    List<? extends CompletableFuture<?>> handleScheduledPollForAllGuilds(@NonNull List<Guild> guilds);
 
     /**
      * Save the agent selection made by a specific user in database for the active poll the user interacted with.
@@ -28,11 +31,15 @@ public interface PollService {
                               @NonNull List<String> selectedAgents,
                               @NonNull Role role);
 
+
     /**
      * Update the poll with data in {@link io.github.pilzi.database.domain.AgentVoteEntity}
-     * @param guild guild to update active poll
+     *
+     * @param guilds set of guilds to update active poll
+     * @return list of update events to schedule
      */
-    void updateAgentPollForSingleGuild(@NonNull Guild guild);
+    @NonNull
+    List<? extends CompletableFuture<?>> updateAgentPollForGuilds(@NonNull Set<Guild> guilds);
 
     void replyToSelectAgentsButtonEventWithAgentPoll(@NonNull ButtonInteractionEvent event);
 }

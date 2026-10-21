@@ -1,6 +1,7 @@
 package io.github.pilzi.discord.listener;
 
 import io.github.pilzi.database.workers.*;
+import io.github.pilzi.discord.BotScheduler;
 import io.github.pilzi.discord.enums.Role;
 import io.github.pilzi.henrikdev.service.RestService;
 import io.github.pilzi.henrikdev.service.impl.RestServiceImpl;
@@ -12,7 +13,6 @@ import io.github.pilzi.service.services.impl.ImportServiceImpl;
 import io.github.pilzi.service.services.impl.PollServiceImpl;
 import net.dv8tion.jda.api.components.selections.SelectOption;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
-import net.dv8tion.jda.api.events.interaction.component.GenericSelectMenuInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -31,10 +31,11 @@ import static io.github.pilzi.service.services.impl.ImportServiceImpl.HENRIKDEV_
 import static io.github.pilzi.service.services.impl.ImportServiceImpl.VALORANT_REGION_ENV;
 
 public class BotListener extends ListenerAdapter {
-    public static final int SCHEDULE_PERIOD_IN_HOURS = 2;
+    public static final int IMPORT_AND_MESSAGE_DELAY_IN_HOURS = 2;
+    public static final int MESSAGE_UPDATE_EVENT_SCHEDULED_IN_SECONDS = 5;
     public static final int SCHEDULE_INITIAL_DELAY_IN_HOURS = 0;
     @NonNull
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(5);
     @NonNull
     private final EventWorker eventWorker = new EventWorker();
     @NonNull
@@ -58,15 +59,20 @@ public class BotListener extends ListenerAdapter {
             activePollWorker,
             hibernateSessionFactoryService,
             agentVoteWorker);
-
+    @NonNull
+    private final BotScheduler botScheduler = new BotScheduler(pollService);
 
     @Override
     public void onReady(@NonNull ReadyEvent event) {
         // Schedule regular event to fill the database with premier event data
-        scheduler.scheduleAtFixedRate(importService::importPremierData, SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.HOURS);
+        scheduler.scheduleAtFixedRate(importService::importPremierData, SCHEDULE_INITIAL_DELAY_IN_HOURS, IMPORT_AND_MESSAGE_DELAY_IN_HOURS, TimeUnit.HOURS);
 
         // Check if there is an active poll for the next event week
-        scheduler.scheduleAtFixedRate(() -> pollService.handleScheduledPollForAllGuilds(event.getJDA().getGuilds()), SCHEDULE_INITIAL_DELAY_IN_HOURS, SCHEDULE_PERIOD_IN_HOURS, TimeUnit.HOURS);
+        scheduler.scheduleAtFixedRate(() -> botScheduler.resetGuildsToSendActivePollTo(event.getJDA().getGuilds()), SCHEDULE_INITIAL_DELAY_IN_HOURS, IMPORT_AND_MESSAGE_DELAY_IN_HOURS, TimeUnit.HOURS);
+
+        // If there are more than 50 guilds it's not possible to send the poll to each one of them in the same second
+        // And edits for the same message have a very strict request limit prevented by this scheduler
+        scheduler.scheduleAtFixedRate(botScheduler::executeUpdates, MESSAGE_UPDATE_EVENT_SCHEDULED_IN_SECONDS, MESSAGE_UPDATE_EVENT_SCHEDULED_IN_SECONDS, TimeUnit.SECONDS);
     }
 
     @Override
@@ -92,7 +98,8 @@ public class BotListener extends ListenerAdapter {
                     selectedAgents,
                     Role.getRoleByCustomComponentId(event.getCustomId()));
 
-            pollService.updateAgentPollForSingleGuild(event.getGuild());
+            // The there is a really high request limit to edit messages. To prevent this a scheduler is used to sync
+            botScheduler.addGuildToUpdateAgentPoll(event.getGuild());
         }
     }
 }

@@ -1,9 +1,15 @@
 package io.github.pilzi.service.services.impl;
 
-import io.github.pilzi.database.domain.*;
+import io.github.pilzi.database.domain.ActivePollEntity;
+import io.github.pilzi.database.domain.AgentVoteEntity;
+import io.github.pilzi.database.domain.EventEntity;
+import io.github.pilzi.database.domain.GuildEntity;
 import io.github.pilzi.database.utils.AgentVoteUtil;
 import io.github.pilzi.database.utils.TransactionalUtil;
-import io.github.pilzi.database.workers.*;
+import io.github.pilzi.database.workers.ActivePollWorker;
+import io.github.pilzi.database.workers.AgentVoteWorker;
+import io.github.pilzi.database.workers.EventWorker;
+import io.github.pilzi.database.workers.GuildWorker;
 import io.github.pilzi.discord.enums.Role;
 import io.github.pilzi.discord.utils.GuildUtil;
 import io.github.pilzi.discord.utils.LanguageUtil;
@@ -26,9 +32,10 @@ import org.hibernate.Session;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-import java.awt.*;
 import java.util.*;
-import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicReference;
 
 
 public class PollServiceImpl implements PollService {
@@ -63,7 +70,9 @@ public class PollServiceImpl implements PollService {
     }
 
     @Override
-    public void handleScheduledPollForAllGuilds(@NonNull List<Guild> guilds) {
+    public @NonNull List<? extends CompletableFuture<?>> handleScheduledPollForAllGuilds(@NonNull List<Guild> guilds) {
+        List<CompletableFuture<?>> scheduledPolls = new ArrayList<>();
+
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             List<EventEntity> eventsInCurrentWeek = eventWorker.collectEventsForCurrentWeek(session);
 
@@ -86,31 +95,41 @@ public class PollServiceImpl implements PollService {
                     Optional<TextChannel> textChannelOptional = GuildUtil.findChannelInGuild(guild);
 
                     if (textChannelOptional.isPresent()) {
-                        sendScheduledPoll(textChannelOptional.get(), eventsInCurrentWeek, newCreatedActivePollEntity);
+                        CompletableFuture<Void> future = sendScheduledPoll(textChannelOptional.get(), eventsInCurrentWeek, guild.getIdLong());
+                        if (future != null) {
+                            scheduledPolls.add(future);
+                        }
                     }
                 }
             });
         });
+
+        return scheduledPolls;
     }
 
     private static boolean isActivePollExpired(@Nullable ActivePollEntity activePollEntity) {
-        return activePollEntity == null || !CalendarUtil.doesMatchWeekBounds(activePollEntity.getStartAt(), activePollEntity.getEndAt());
+        return activePollEntity != null && !CalendarUtil.doesMatchWeekBounds(activePollEntity.getStartAt(), activePollEntity.getEndAt());
     }
 
-
-    private static void sendScheduledPoll(@NonNull GuildChannel guildChannel,
-                                          @NonNull List<EventEntity> eventsInCurrentWeek,
-                                          @NonNull ActivePollEntity newCreatedActivePollEntity) {
+    @Nullable
+    private CompletableFuture<Void> sendScheduledPoll(@NonNull GuildChannel guildChannel,
+                                                      @NonNull List<EventEntity> eventsInCurrentWeek,
+                                                      @NonNull Long guildId) {
         String channelId = guildChannel.getId();
         TextChannel textChannel = guildChannel.getGuild().getTextChannelById(channelId);
         if (textChannel != null) {
-            Message sentMessage = textChannel.sendMessage("")
+            new CompletableFuture<>();
+            return textChannel.sendMessage("")
                     .setPoll(PollUtil.buildEventPoll(getMap(eventsInCurrentWeek), eventsInCurrentWeek))
                     .addComponents(ButtonUtil.getAgentSelectionButton())
-                    .complete();
-
-            newCreatedActivePollEntity.setMessageId(sentMessage.getIdLong());
+                    .submit()
+                    .thenAcceptAsync(msg -> TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
+                        ActivePollEntity activePollEntity = activePollWorker.getActivePoll(session, guildId);
+                        activePollEntity.setMessageId(msg.getIdLong());
+                    }));
         }
+
+        return null;
     }
 
     @Override
@@ -192,42 +211,57 @@ public class PollServiceImpl implements PollService {
         });
     }
 
-    @Override
-    public void updateAgentPollForSingleGuild(@NonNull Guild guild) {
-        TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
+    @Nullable
+    private CompletableFuture<?> updateAgentPollForSingleGuild(@NonNull Guild guild) {
 
-            ActivePollEntity scheduledActivePoll = activePollWorker.getActivePoll(session, guild.getIdLong());
-            Optional<TextChannel> textChannelOptional = GuildUtil.findChannelInGuild(guild);
+        List<AgentVoteEntity> agentVotes = new ArrayList<>();
+        AtomicReference<ActivePollEntity> scheduledActivePoll = new AtomicReference<>();
+
+        Optional<TextChannel> textChannelOptional = GuildUtil.findChannelInGuild(guild);
+
+        TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
+            scheduledActivePoll.set(activePollWorker.getActivePoll(session, guild.getIdLong()));
 
             if (textChannelOptional.isPresent()) {
-                List<AgentVoteEntity> agentVotes = agentVoteWorker.getAllVotes(session, Objects.requireNonNull(scheduledActivePoll.getId()));
-                Map<Long, List<String>> userForAgents = AgentVoteUtil.collectAgentsForUser(agentVotes);
-
-                List<Long> userIdsToFetch = new ArrayList<>(userForAgents.keySet());
-
-                textChannelOptional.get().retrieveMessageById(scheduledActivePoll.getMessageId()).queue(message -> {
-                    if (!userForAgents.isEmpty()) {
-                        updateMessageAgentEmbeds(guild, message, userIdsToFetch, userForAgents);
-                    } else {
-                        message.suppressEmbeds(true).queue();
-                    }
-                });
+                agentVotes.addAll(agentVoteWorker.getAllVotes(session, Objects.requireNonNull(scheduledActivePoll.get().getId())));
             }
         });
+
+        if (textChannelOptional.isPresent()) {
+            Map<Long, List<String>> userForAgents = AgentVoteUtil.collectAgentsForUser(agentVotes);
+            try {
+                Message message = textChannelOptional.get().retrieveMessageById(scheduledActivePoll.get().getMessageId()).submit().get();
+
+                if (!userForAgents.isEmpty()) {
+                    return updateMessageAgentEmbeds(guild, message, userForAgents);
+                } else {
+                    return message.suppressEmbeds(true).submit();
+                }
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        return null;
     }
 
-    private static void updateMessageAgentEmbeds(@NonNull Guild guild,
-                                                 @NonNull Message message,
-                                                 @NonNull List<Long> userIdsToFetch,
-                                                 @NonNull Map<Long, List<String>> userForAgents) {
+    @Override
+    public @NonNull List<? extends CompletableFuture<?>> updateAgentPollForGuilds(@NonNull Set<Guild> guilds) {
+        return guilds.stream().map(this::updateAgentPollForSingleGuild).filter(Objects::nonNull).toList();
+    }
+
+    @NonNull
+    private static CompletableFuture<Message> updateMessageAgentEmbeds(@NonNull Guild guild,
+                                                                       @NonNull Message message,
+                                                                       @NonNull Map<Long, List<String>> userForAgents) {
         message.suppressEmbeds(false).queue();
+        List<Long> userIdsToFetch = new ArrayList<>(userForAgents.keySet());
 
-        guild.retrieveMembersByIds(userIdsToFetch).onSuccess(members -> {
-            Map<Long, String> memberNames = getMemberIdForMemberMap(members);
+        List<Member> members = guild.retrieveMembersByIds(userIdsToFetch).get();
+        Map<Long, String> memberNames = getMemberIdForMemberMap(members);
 
-            EmbedBuilder embedBuilder = EmbedUtil.createUserAgentsDisplayEmbedBuilder(userForAgents, memberNames);
-            message.editMessageEmbeds(embedBuilder.build()).complete();
-        });
+        EmbedBuilder embedBuilder = EmbedUtil.createUserAgentsDisplayEmbedBuilder(userForAgents, memberNames);
+        return message.editMessageEmbeds(embedBuilder.build()).submit();
     }
 
     private static @NonNull Map<Long, String> getMemberIdForMemberMap(@NonNull List<Member> members) {
