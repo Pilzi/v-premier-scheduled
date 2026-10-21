@@ -83,7 +83,6 @@ public class PollServiceImpl implements PollService {
             guilds.forEach(guild -> {
                 try {
                     handleScheduledPollForGuild(session, guild, eventsInCurrentWeek, scheduledPolls);
-                    throw new RuntimeException("test");
                 } catch (Exception e) {
                     logger.error("unable to send active poll to guild with name: {}", guild.getName(), e);
                 }
