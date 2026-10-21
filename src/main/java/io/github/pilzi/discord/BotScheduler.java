@@ -24,12 +24,7 @@ public class BotScheduler {
         this.pollService = pollService;
     }
 
-    public void executeUpdates() {
-        updateActivePollForGuilds();
-        updateAgentPollForGuilds();
-    }
-
-    private void updateActivePollForGuilds() {
+    public void updateActivePollForGuilds() {
         List<Guild> guildsToUpdate = new ArrayList<>();
 
         guildsToSendActivePoll.stream()
@@ -41,7 +36,7 @@ public class BotScheduler {
 
     }
 
-    private void updateAgentPollForGuilds() {
+    public void updateAgentPollForGuilds() {
         Set<Guild> guildsToUpdate = new HashSet<>();
 
         int amountOfGuildsToUpdate = guildsToSendActivePoll.isEmpty() ? MAX_GUILD_UPDATES_PER_SECOND : MAX_GUILD_UPDATES_PER_SECOND_LIMITED;
@@ -49,9 +44,9 @@ public class BotScheduler {
         guildsToUpdateAgentsPoll.stream()
                 .limit(amountOfGuildsToUpdate)
                 .forEach(guildsToUpdate::add);
+        guildsToUpdate.forEach(guildsToUpdateAgentsPoll::remove);
 
         pollService.updateAgentPollForGuilds(guildsToUpdate).forEach(CompletableFuture::join);
-        guildsToUpdate.forEach(guildsToUpdateAgentsPoll::remove);
 
     }
 

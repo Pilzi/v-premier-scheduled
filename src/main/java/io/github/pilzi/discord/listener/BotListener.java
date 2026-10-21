@@ -32,7 +32,8 @@ import static io.github.pilzi.service.services.impl.ImportServiceImpl.VALORANT_R
 
 public class BotListener extends ListenerAdapter {
     public static final int IMPORT_AND_MESSAGE_DELAY_IN_HOURS = 2;
-    public static final int MESSAGE_UPDATE_EVENT_SCHEDULED_IN_SECONDS = 5;
+    public static final int UPDATE_AGENT_POLL_SCHEDULER_INTERVAL = 10;
+    public static final int UPDATE_ACTIVE_POLL_SCHEDULER_INTERVAL = 2;
     public static final int SCHEDULE_INITIAL_DELAY_IN_HOURS = 0;
     @NonNull
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(5);
@@ -65,14 +66,16 @@ public class BotListener extends ListenerAdapter {
     @Override
     public void onReady(@NonNull ReadyEvent event) {
         // Schedule regular event to fill the database with premier event data
-        // scheduler.scheduleAtFixedRate(importService::importPremierData, SCHEDULE_INITIAL_DELAY_IN_HOURS, IMPORT_AND_MESSAGE_DELAY_IN_HOURS, TimeUnit.HOURS);
+        scheduler.scheduleAtFixedRate(importService::importPremierData, SCHEDULE_INITIAL_DELAY_IN_HOURS, IMPORT_AND_MESSAGE_DELAY_IN_HOURS, TimeUnit.HOURS);
 
         // Check if there is an active poll for the next event week
         scheduler.scheduleAtFixedRate(() -> botScheduler.resetGuildsToSendActivePollTo(event.getJDA().getGuilds()), SCHEDULE_INITIAL_DELAY_IN_HOURS, IMPORT_AND_MESSAGE_DELAY_IN_HOURS, TimeUnit.HOURS);
 
         // If there are more than 50 guilds it's not possible to send the poll to each one of them in the same second
+        scheduler.scheduleAtFixedRate(botScheduler::updateActivePollForGuilds, UPDATE_ACTIVE_POLL_SCHEDULER_INTERVAL, UPDATE_ACTIVE_POLL_SCHEDULER_INTERVAL, TimeUnit.SECONDS);
+
         // And edits for the same message have a very strict request limit prevented by this scheduler
-        scheduler.scheduleAtFixedRate(botScheduler::executeUpdates, MESSAGE_UPDATE_EVENT_SCHEDULED_IN_SECONDS, MESSAGE_UPDATE_EVENT_SCHEDULED_IN_SECONDS, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(botScheduler::updateAgentPollForGuilds, UPDATE_AGENT_POLL_SCHEDULER_INTERVAL, UPDATE_AGENT_POLL_SCHEDULER_INTERVAL, TimeUnit.SECONDS);
     }
 
     @Override

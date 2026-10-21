@@ -80,13 +80,15 @@ public class PollServiceImpl implements PollService {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             List<EventEntity> eventsInCurrentWeek = eventWorker.collectEventsForCurrentWeek(session);
 
-            guilds.forEach(guild -> {
-                try {
-                    handleScheduledPollForGuild(session, guild, eventsInCurrentWeek, scheduledPolls);
-                } catch (Exception e) {
-                    logger.error("unable to send active poll to guild with name: {}", guild.getName(), e);
-                }
-            });
+            if (!eventsInCurrentWeek.isEmpty()) {
+                guilds.forEach(guild -> {
+                    try {
+                        handleScheduledPollForGuild(session, guild, eventsInCurrentWeek, scheduledPolls);
+                    } catch (Exception e) {
+                        logger.error("unable to send active poll to guild with name: {}", guild.getName(), e);
+                    }
+                });
+            }
         });
 
         return scheduledPolls;
@@ -263,7 +265,7 @@ public class PollServiceImpl implements PollService {
                 .map(guild -> {
                     try {
                         return this.updateAgentPollForSingleGuild(guild);
-                    } catch (Exception e){
+                    } catch (Exception e) {
                         logger.error("update agent poll error: guildName={} guildId={}", guild.getName(), guild.getId(), e);
                         return null;
                     }
@@ -276,7 +278,7 @@ public class PollServiceImpl implements PollService {
     private static CompletableFuture<Message> updateMessageAgentEmbeds(@NonNull Guild guild,
                                                                        @NonNull Message message,
                                                                        @NonNull Map<Long, List<String>> userForAgents) {
-        message.suppressEmbeds(false).queue();
+        message.suppressEmbeds(false).complete();
         List<Long> userIdsToFetch = new ArrayList<>(userForAgents.keySet());
 
         List<Member> members = guild.retrieveMembersByIds(userIdsToFetch).get();
