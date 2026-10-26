@@ -43,4 +43,13 @@ public class AgentVoteWorker {
                 .setParameter("discordUserId", discordUserId)
                 .list();
     }
+
+    public void deleteVotesForGuild(@NonNull Session session,
+                                    @NonNull Long guildId) {
+        session.createQuery("DELETE" +
+                        " FROM AgentVoteEntity vote" +
+                        " WHERE vote.activePoll.guild.discordId = :guildId")
+                .setParameter("guildId", guildId)
+                .executeUpdate();
+    }
 }

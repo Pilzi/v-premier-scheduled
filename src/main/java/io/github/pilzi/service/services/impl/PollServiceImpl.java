@@ -104,16 +104,23 @@ public class PollServiceImpl implements PollService {
             session.flush();
         }
 
-        if (isActivePollOrMessageIdNull(activePollEntity)) {
-            ActivePollEntity newCreatedActivePollEntity = new ActivePollEntity(CalendarUtil.getFirstInstantOfCurrentWeek(),
+        boolean createNewActivePoll = activePollEntity == null;
+        if (createNewActivePoll) {
+            activePollEntity = new ActivePollEntity(CalendarUtil.getFirstInstantOfCurrentWeek(),
                     CalendarUtil.getLastInstantOfCurrentWeek(),
                     guildEntity);
-            session.persist(newCreatedActivePollEntity);
+            session.persist(activePollEntity);
+        }
 
-            Optional<TextChannel> textChannelOptional = GuildUtil.findChannelInGuild(guild);
+        Optional<TextChannel> textChannelOptional = GuildUtil.findChannelInGuild(guild);
+        if (textChannelOptional.isPresent()) {
+            if (!isActivePollMessageValid(activePollEntity, textChannelOptional.get())) {
 
-            if (textChannelOptional.isPresent()) {
-                CompletableFuture<Void> future = sendScheduledPoll(textChannelOptional.get(), eventsInCurrentWeek, guild.getIdLong());
+                CompletableFuture<Void> future = sendScheduledPoll(textChannelOptional.get(),
+                        eventsInCurrentWeek,
+                        guild.getIdLong(),
+                        // It's impossible for a new active poll to have any votes. There should be a vote reset when a new poll is sent
+                        !createNewActivePoll);
                 if (future != null) {
                     scheduledPolls.add(future);
                 }
@@ -128,7 +135,8 @@ public class PollServiceImpl implements PollService {
     @Nullable
     private CompletableFuture<Void> sendScheduledPoll(@NonNull GuildChannel guildChannel,
                                                       @NonNull List<EventEntity> eventsInCurrentWeek,
-                                                      @NonNull Long guildId) {
+                                                      @NonNull Long guildId,
+                                                      boolean deleteAgentVotes) {
         String channelId = guildChannel.getId();
         TextChannel textChannel = guildChannel.getGuild().getTextChannelById(channelId);
         if (textChannel != null) {
@@ -140,6 +148,9 @@ public class PollServiceImpl implements PollService {
                     .thenAcceptAsync(msg -> TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
                         ActivePollEntity activePollEntity = activePollWorker.getActivePoll(session, guildId);
                         activePollEntity.setMessageId(msg.getIdLong());
+                        if (deleteAgentVotes) {
+                            agentVoteWorker.deleteVotesForGuild(session, guildId);
+                        }
                     }));
         }
 
@@ -151,12 +162,15 @@ public class PollServiceImpl implements PollService {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             ActivePollEntity scheduledActivePoll = activePollWorker.getActivePoll(session, Objects.requireNonNull(event.getGuild()).getIdLong());
 
-            if (isActivePollOrMessageIdNull(scheduledActivePoll)) {
+            if (scheduledActivePoll == null || !isActivePollMessageValid(scheduledActivePoll, event.getChannel().asTextChannel())) {
                 replyToEventWithVoteNotPossible(event, LanguageUtil.getAgentVoteNotPossibleAnymore());
-            } else if (scheduledActivePoll.getMessageId() != event.getMessageIdLong()) {
-                replyToEventWithVoteNotPossibleAndLinkToActivePoll(event, scheduledActivePoll);
             } else {
-                replyToEventWithAgentPoll(event, session, scheduledActivePoll);
+                Long messageId = scheduledActivePoll.getMessageId();
+                if (messageId != null && messageId != event.getMessageIdLong()) {
+                    replyToEventWithVoteNotPossibleAndLinkToActivePoll(event, scheduledActivePoll);
+                } else {
+                    replyToEventWithAgentPoll(event, session, scheduledActivePoll);
+                }
             }
         });
     }
@@ -202,8 +216,22 @@ public class PollServiceImpl implements PollService {
                 .queue();
     }
 
-    private static boolean isActivePollOrMessageIdNull(@Nullable ActivePollEntity scheduledActivePoll) {
-        return scheduledActivePoll == null || scheduledActivePoll.getMessageId() == null;
+    private static boolean isActivePollMessageValid(@NonNull ActivePollEntity scheduledActivePoll,
+                                                    @NonNull TextChannel textChannel) {
+        Long messageId = scheduledActivePoll.getMessageId();
+
+        if (messageId == null) {
+            return false;
+        }
+
+        boolean messageFound = true;
+        try {
+            textChannel.retrieveMessageById(messageId).complete();
+        } catch (Exception e) {
+            messageFound = false;
+        }
+
+        return messageFound;
     }
 
     private static @NonNull String getMap(@NonNull List<EventEntity> eventsInCurrentWeek) {
