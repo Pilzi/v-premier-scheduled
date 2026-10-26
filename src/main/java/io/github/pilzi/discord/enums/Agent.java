@@ -32,7 +32,8 @@ public enum Agent {
     VIPER("Viper", Role.CONTROLLER, null),
     VYSE("Vyse", Role.SENTINEL, null),
     WAYLAY("Waylay", Role.DUELIST, null),
-    YORU("Yoru", Role.DUELIST, null);
+    YORU("Yoru", Role.DUELIST, null),
+    HUSH("Hush", Role.DUELIST, null);
 
     @NonNull
     private final String displayName;
