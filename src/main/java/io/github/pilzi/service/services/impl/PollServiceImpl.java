@@ -28,6 +28,8 @@ import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.exceptions.ErrorResponseException;
+import net.dv8tion.jda.api.requests.ErrorResponse;
 import org.hibernate.Session;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -224,14 +226,20 @@ public class PollServiceImpl implements PollService {
             return false;
         }
 
-        boolean messageFound = true;
         try {
             textChannel.retrieveMessageById(messageId).complete();
+            return true;
         } catch (Exception e) {
-            messageFound = false;
-        }
+            boolean messageDeleted = e instanceof ErrorResponseException errorResponseException
+                    && errorResponseException.getErrorResponse() == ErrorResponse.UNKNOWN_MESSAGE;
 
-        return messageFound;
+            if (!messageDeleted) {
+                logger.warn("could not check poll message, keeping the poll: guildId={} messageId={}",
+                        textChannel.getGuild().getId(), messageId, e);
+            }
+
+            return !messageDeleted;
+        }
     }
 
     private static @NonNull String getMap(@NonNull List<EventEntity> eventsInCurrentWeek) {
