@@ -3,6 +3,7 @@ package io.github.pilzi.discord.listener;
 import io.github.pilzi.database.workers.*;
 import io.github.pilzi.discord.BotScheduler;
 import io.github.pilzi.discord.enums.Role;
+import io.github.pilzi.discord.utils.SchedulerUtil;
 import io.github.pilzi.henrikdev.service.RestService;
 import io.github.pilzi.henrikdev.service.impl.RestServiceImpl;
 import io.github.pilzi.service.services.HibernateSessionFactoryService;
@@ -66,16 +67,16 @@ public class BotListener extends ListenerAdapter {
     @Override
     public void onReady(@NonNull ReadyEvent event) {
         // Schedule regular event to fill the database with premier event data
-        scheduler.scheduleAtFixedRate(importService::importPremierData, SCHEDULE_INITIAL_DELAY_IN_HOURS, IMPORT_AND_MESSAGE_DELAY_IN_HOURS, TimeUnit.HOURS);
+        scheduler.scheduleAtFixedRate(() -> SchedulerUtil.safe("premier data import", importService::importPremierData), SCHEDULE_INITIAL_DELAY_IN_HOURS, IMPORT_AND_MESSAGE_DELAY_IN_HOURS, TimeUnit.HOURS);
 
         // Check if there is an active poll for the next event week
-        scheduler.scheduleAtFixedRate(() -> botScheduler.resetGuildsToSendActivePollTo(event.getJDA().getGuilds()), SCHEDULE_INITIAL_DELAY_IN_HOURS, IMPORT_AND_MESSAGE_DELAY_IN_HOURS, TimeUnit.HOURS);
+        scheduler.scheduleAtFixedRate(() -> SchedulerUtil.safe("active poll handler", () -> botScheduler.resetGuildsToSendActivePollTo(event.getJDA().getGuilds())), SCHEDULE_INITIAL_DELAY_IN_HOURS, IMPORT_AND_MESSAGE_DELAY_IN_HOURS, TimeUnit.HOURS);
 
         // If there are more than 50 guilds it's not possible to send the poll to each one of them in the same second
-        scheduler.scheduleAtFixedRate(botScheduler::updateActivePollForGuilds, UPDATE_ACTIVE_POLL_SCHEDULER_INTERVAL, UPDATE_ACTIVE_POLL_SCHEDULER_INTERVAL, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(() -> SchedulerUtil.safe("active poll update", botScheduler::updateActivePollForGuilds), UPDATE_ACTIVE_POLL_SCHEDULER_INTERVAL, UPDATE_ACTIVE_POLL_SCHEDULER_INTERVAL, TimeUnit.SECONDS);
 
         // And edits for the same message have a very strict request limit prevented by this scheduler
-        scheduler.scheduleAtFixedRate(botScheduler::updateAgentPollForGuilds, UPDATE_AGENT_POLL_SCHEDULER_INTERVAL, UPDATE_AGENT_POLL_SCHEDULER_INTERVAL, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(() -> SchedulerUtil.safe("agent poll update", botScheduler::updateAgentPollForGuilds), UPDATE_AGENT_POLL_SCHEDULER_INTERVAL, UPDATE_AGENT_POLL_SCHEDULER_INTERVAL, TimeUnit.SECONDS);
     }
 
     @Override
