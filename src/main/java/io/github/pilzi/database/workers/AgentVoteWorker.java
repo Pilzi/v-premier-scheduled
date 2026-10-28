@@ -10,14 +10,17 @@ import java.util.List;
 public class AgentVoteWorker {
 
     public void deleteVoteByRole(@NonNull Session session,
+                                 @NonNull Long guildId,
                                  @NonNull Role agentRole,
                                  @NonNull Long discordUserId) {
         session.createQuery("DELETE" +
                         " FROM AgentVoteEntity vote" +
                         " WHERE vote.agentRole = :agentRole" +
+                        " AND vote.activePoll.guild.discordId = :guildId" +
                         " AND vote.discordUserId = :discordUserId")
                 .setParameter("agentRole", agentRole)
                 .setParameter("discordUserId", discordUserId)
+                .setParameter("guildId", guildId)
                 .executeUpdate();
     }
 

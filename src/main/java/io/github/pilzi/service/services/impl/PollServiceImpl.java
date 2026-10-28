@@ -254,7 +254,7 @@ public class PollServiceImpl implements PollService {
                                      @NonNull Role role) {
         TransactionalUtil.executeInTransaction(hibernateSessionFactoryService, session -> {
             // Delete all existing agents with this specific role
-            agentVoteWorker.deleteVoteByRole(session, role, discordUserId);
+            agentVoteWorker.deleteVoteByRole(session, guildId, role, discordUserId);
             ActivePollEntity scheduledActivePoll = Objects.requireNonNull(activePollWorker.getActivePoll(session, guildId));
             // Save all selected agents in database
             selectedAgents.forEach(agent -> session.persist(new AgentVoteEntity(discordUserId, agent, role, scheduledActivePoll)));
