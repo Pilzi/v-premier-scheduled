@@ -14,7 +14,6 @@ import io.github.pilzi.service.services.impl.ImportServiceImpl;
 import junit.framework.Assert;
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 
@@ -134,7 +133,6 @@ public class ImportPremiereDataTest extends TestContainer {
         });
     }
 
-    @Disabled // TODO this is not implemented yet
     @Test
     public void does_the_importer_delete_unused_season_entities() {
         importService.importPremierData();
@@ -147,7 +145,7 @@ public class ImportPremiereDataTest extends TestContainer {
 
             SeasonEntity unusedSeasonEntity = new SeasonEntity(UUID.randomUUID(), Instant.now(), Instant.now());
             seasonWorker.persist(session, unusedSeasonEntity);
-            List<EventEntity> seasonEntitiesAfterAddingUnusedSeason = eventWorker.getAll(session);
+            List<SeasonEntity> seasonEntitiesAfterAddingUnusedSeason = seasonWorker.getAll(session);
 
             Assert.assertEquals(seasonEntitiesBeforeAddingUnusedSeason.size() + 1, seasonEntitiesAfterAddingUnusedSeason.size());
         });
