@@ -76,7 +76,6 @@ public class ImportServiceImpl implements ImportService {
         List<SeasonEntity> managedSeasonEntities = new ArrayList<>();
         List<SeasonEntity> existingSeasonEntities = seasonWorker.getAll(session);
 
-
         seasonEntities.forEach(seasonEntity -> {
             Optional<SeasonEntity> matchingExistingEntity = existingSeasonEntities.stream()
                     .filter(existingEntity -> existingEntity.getExternalId().equals(seasonEntity.getExternalId()))
@@ -86,11 +85,15 @@ public class ImportServiceImpl implements ImportService {
                 SeasonEntity existingSeason = matchingExistingEntity.get();
                 seasonWorker.update(existingSeason, seasonEntity);
                 managedSeasonEntities.add(existingSeason);
+                existingSeasonEntities.remove(existingSeason);
+
             } else {
                 seasonsToPersist.add(seasonEntity);
                 managedSeasonEntities.add(seasonEntity);
             }
         });
+
+        existingSeasonEntities.forEach(session::remove);
 
         persistAll(session, seasonsToPersist);
         return managedSeasonEntities;
