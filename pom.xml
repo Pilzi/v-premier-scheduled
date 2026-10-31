@@ -14,7 +14,8 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <java-version>25</java-version>
     <hibernate.version>6.6.1.Final</hibernate.version>
-    <postgres.connection.version>42.7.13</postgres.connection.version>
+    <postgres.connection.version>42.7.14</postgres.connection.version>
+    <jackson.version>2.22.4</jackson.version>
   </properties>
 
   <dependencies>
@@ -34,20 +35,20 @@
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
-      <version>2.22.2</version>
+      <version>${jackson.version}</version>
       <scope>compile</scope>
     </dependency>
 
     <dependency>
       <groupId>com.fasterxml.jackson.datatype</groupId>
       <artifactId>jackson-datatype-jsr310</artifactId>
-      <version>2.22.2</version>
+      <version>${jackson.version}</version>
     </dependency>
 
     <dependency>
       <groupId>net.dv8tion</groupId>
       <artifactId>JDA</artifactId>
-      <version>6.5.0</version>
+      <version>6.7.0</version>
     </dependency>
 
     <dependency>
@@ -121,6 +122,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.16.0</version>
         <configuration>
           <source>${java-version}</source>
           <target>${java-version}</target>
@@ -129,7 +131,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
-        <version>3.5.1</version>
+        <version>3.6.2</version>
         <executions>
           <execution>
             <phase>package</phase>
