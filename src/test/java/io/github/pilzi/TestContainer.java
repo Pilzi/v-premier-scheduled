@@ -2,7 +2,9 @@ package io.github.pilzi;
 
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.MountableFile;
@@ -25,5 +27,10 @@ public abstract class TestContainer{
     @AfterAll
     static void afterAll() {
         postgres.stop();
+    }
+
+    @Test
+    public void does_test_container_work() {
+        Assertions.assertTrue(postgres.isRunning(), "The container should run!");
     }
 }
