@@ -26,7 +26,6 @@ public interface PollService {
      * Save the agent selection made by a specific user in database for the active poll the user interacted with.
      */
     void importSelectedAgents(@NonNull Long guildId,
-                              @NonNull Long messageId,
                               @NonNull Long discordUserId,
                               @NonNull List<String> selectedAgents,
                               @NonNull Role role);

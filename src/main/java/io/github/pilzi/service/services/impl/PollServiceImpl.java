@@ -117,7 +117,6 @@ public class PollServiceImpl implements PollService {
         Optional<TextChannel> textChannelOptional = GuildUtil.findChannelInGuild(guild);
         if (textChannelOptional.isPresent()) {
             if (!isActivePollMessageValid(activePollEntity, textChannelOptional.get())) {
-
                 CompletableFuture<Void> future = sendScheduledPoll(textChannelOptional.get(),
                         eventsInCurrentWeek,
                         guild.getIdLong(),
@@ -248,7 +247,6 @@ public class PollServiceImpl implements PollService {
 
     @Override
     public void importSelectedAgents(@NonNull Long guildId,
-                                     @NonNull Long messageId,
                                      @NonNull Long discordUserId,
                                      @NonNull List<String> selectedAgents,
                                      @NonNull Role role) {

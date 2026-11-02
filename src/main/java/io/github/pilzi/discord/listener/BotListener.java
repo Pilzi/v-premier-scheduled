@@ -97,7 +97,6 @@ public class BotListener extends ListenerAdapter {
 
             pollService.importSelectedAgents(
                     Objects.requireNonNull(event.getGuild()).getIdLong(),
-                    event.getMessageIdLong(),
                     event.getInteraction().getUser().getIdLong(),
                     selectedAgents,
                     Role.getRoleByCustomComponentId(event.getCustomId()));
